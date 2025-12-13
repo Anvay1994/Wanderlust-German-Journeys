@@ -138,16 +138,16 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       if (authError) throw authError;
       if (!authData.user) throw new Error("No user created");
 
-      // 2. Create Profile Row
-      const newProfile = {
+      // 2. Create Profile Row (Using snake_case for DB)
+      const dbProfile = {
         id: authData.user.id,
-        name: name || 'Traveler',
+        full_name: name || 'Traveler',
         email: email,
-        level,
+        current_level: level,
         interests,
         credits: 100,
         xp: 0,
-        streak: 1,
+        streak_count: 1,
         completed_modules: [],
         unlocked_modules: starterPack,
         owned_levels: []
@@ -155,18 +155,18 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert(newProfile);
+        .insert(dbProfile);
 
       if (profileError) throw profileError;
 
-      // 3. Complete
+      // 3. Complete (Using camelCase for App State)
       onComplete({
-        name: newProfile.name,
-        level: newProfile.level,
-        interests: newProfile.interests,
-        credits: newProfile.credits,
-        xp: newProfile.xp,
-        streak: newProfile.streak,
+        name: name || 'Traveler',
+        level: level,
+        interests: interests,
+        credits: 100,
+        xp: 0,
+        streak: 1,
         completedModules: [],
         unlockedModules: starterPack,
         ownedLevels: []

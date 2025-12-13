@@ -1,41 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
-import { UserProfile } from '../types';
+import { UserProfile, GermanLevel } from '../types';
 
-// Helper to safely access env vars in various environments (Vite, Webpack, etc.)
-const getEnv = (key: string) => {
-  try {
-    // Check import.meta.env (Vite standard)
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-      // @ts-ignore
-      return import.meta.env[key];
-    }
-    // Check process.env (Node/Webpack standard)
-    if (typeof process !== 'undefined' && process.env && process.env[key]) {
-      return process.env[key];
-    }
-  } catch (e) {
-    // Ignore errors in strict environments
-  }
-  return '';
-};
+// Access environment variables using Vite's import.meta.env
+// We cast to 'any' to avoid TypeScript errors if the vite/client types aren't loaded globally
+const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
+const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 
-const supabaseUrl = getEnv('SUPABASE_URL');
-const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
-
-// Prevent crash if env vars are missing by using a Mock Client
+// Initialize the Supabase client
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey)
   : {
-      // MOCK IMPLEMENTATION (Prevents "supabaseUrl is required" crash)
+      // Mock implementation to prevent crashes if env vars are missing
       auth: {
          getSession: async () => ({ data: { session: null }, error: null }),
          onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-         signInWithPassword: async () => ({ error: { message: "Supabase not configured (Missing SUPABASE_URL)" } }),
-         signUp: async () => ({ error: { message: "Supabase not configured (Missing SUPABASE_URL)" } }),
+         signInWithPassword: async () => ({ error: { message: "Supabase not configured (Missing VITE_SUPABASE_URL)" } }),
+         signUp: async () => ({ error: { message: "Supabase not configured (Missing VITE_SUPABASE_URL)" } }),
          signOut: async () => ({ error: null }),
       },
-      from: (table: string) => ({
+      from: () => ({
          select: () => ({
             eq: () => ({
                single: async () => ({ data: null, error: null }),
@@ -48,16 +31,18 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
     } as any;
 
 /**
- * Maps the raw DB row to our frontend UserProfile type
+ * Maps the raw DB row (snake_case) to the frontend UserProfile type (camelCase).
  */
 export const mapProfileToUser = (row: any): UserProfile => {
   return {
-    name: row.name,
-    level: row.level,
+    // We map the requested fields even if they aren't strictly in the UserProfile interface yet
+    // to ensure data availability if the type definition expands.
+    name: row.full_name || 'Traveler',
+    level: (row.current_level as GermanLevel) || GermanLevel.A1,
     interests: row.interests || [],
-    credits: row.credits,
-    xp: row.xp,
-    streak: row.streak,
+    credits: row.credits || 0,
+    xp: row.xp || 0,
+    streak: row.streak_count || 0,
     completedModules: row.completed_modules || [],
     unlockedModules: row.unlocked_modules || [],
     ownedLevels: row.owned_levels || []
@@ -65,19 +50,23 @@ export const mapProfileToUser = (row: any): UserProfile => {
 };
 
 /**
- * Updates the user profile in Supabase
+ * Updates the user profile in Supabase by mapping camelCase updates to snake_case columns.
  */
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
-  // Convert frontend camelCase to DB snake_case where necessary
   const dbUpdates: any = {};
+  
+  // Map frontend keys to DB columns
+  if (updates.name !== undefined) dbUpdates.full_name = updates.name;
+  if (updates.level !== undefined) dbUpdates.current_level = updates.level;
+  if (updates.streak !== undefined) dbUpdates.streak_count = updates.streak;
   if (updates.credits !== undefined) dbUpdates.credits = updates.credits;
   if (updates.xp !== undefined) dbUpdates.xp = updates.xp;
-  if (updates.streak !== undefined) dbUpdates.streak = updates.streak;
-  if (updates.completedModules) dbUpdates.completed_modules = updates.completedModules;
-  if (updates.unlockedModules) dbUpdates.unlocked_modules = updates.unlockedModules;
-  if (updates.ownedLevels) dbUpdates.owned_levels = updates.ownedLevels;
-  if (updates.level) dbUpdates.level = updates.level;
+  if (updates.interests !== undefined) dbUpdates.interests = updates.interests;
+  if (updates.completedModules !== undefined) dbUpdates.completed_modules = updates.completedModules;
+  if (updates.unlockedModules !== undefined) dbUpdates.unlocked_modules = updates.unlockedModules;
+  if (updates.ownedLevels !== undefined) dbUpdates.owned_levels = updates.ownedLevels;
 
+  // Always update timestamp
   dbUpdates.last_active = new Date().toISOString();
 
   const { error } = await supabase
@@ -91,17 +80,19 @@ export const updateUserProfile = async (userId: string, updates: Partial<UserPro
 };
 
 /**
- * Records a transaction in the purchases table
+ * Records a transaction in the transactions table.
  */
-export const recordPurchase = async (userId: string, itemId: string, amount: number, currency: string = 'INR') => {
+export const recordPurchase = async (userId: string, description: string, amountPaid: number) => {
   const { error } = await supabase
-    .from('purchases')
+    .from('transactions')
     .insert({
       user_id: userId,
-      item_id: itemId,
-      amount_paid: amount,
-      currency: currency
+      description: description,
+      amount_inr: amountPaid,
+      amount_credits: 0
     });
     
-  if (error) console.error('Purchase record failed:', error);
+  if (error) {
+    console.error('Purchase record failed:', error);
+  }
 };
