@@ -1,0 +1,7 @@
+{
+  "name": "Wanderlust: German Journeys",
+  "description": "An immersive travel-themed German learning experience. Discover cities, unlock cultural secrets, and master the language as you travel across Germany.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
