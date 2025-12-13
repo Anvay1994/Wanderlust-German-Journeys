@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { UserProfile, CurriculumModule, GermanLevel } from '../types';
 import { CURRICULUM } from '../constants';
 import Button from './Button';
-import { Lock, CheckCircle2, Coins, MapPin, TrendingUp, Book, Compass, HelpCircle, X, Zap, Ticket, CreditCard, Tag, Terminal, PlusCircle, Unlock, RotateCcw } from 'lucide-react';
+import { Lock, CheckCircle2, Coins, MapPin, TrendingUp, Book, Compass, HelpCircle, X, Zap, Ticket, CreditCard, Tag, Terminal, PlusCircle, Unlock, RotateCcw, ShieldAlert } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface DashboardProps {
@@ -12,24 +12,21 @@ interface DashboardProps {
   onOpenLevelPurchase: (level: GermanLevel) => void;
   onOpenGuidebook: () => void;
   onUnlockModule: (moduleId: string, cost: number) => void;
-  onDevAction?: (action: 'add_credits' | 'unlock_all' | 'reset') => void;
+  onDevAction?: (action: 'add_credits' | 'unlock_all' | 'reset' | 'open_admin') => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore, onOpenLevelPurchase, onOpenGuidebook, onDevAction }) => {
   const [showTokenInfo, setShowTokenInfo] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
-  const [priceDisplay, setPriceDisplay] = useState("$100.00");
   
-  // Currency Localization Logic
-  useEffect(() => {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (tz === 'Asia/Kolkata') {
-       // Approx 1 USD = 84 INR
-       setPriceDisplay("₹8,400");
-    } else {
-       setPriceDisplay("$100.00");
-    }
-  }, []);
+  // INDIA MARKET DEFAULT
+  const [currency, setCurrency] = useState({ symbol: '₹', rate: 1 });
+  
+  const getPriceDisplay = (level: GermanLevel) => {
+      // Fixed INR pricing matching StoreModal
+      const price = level === GermanLevel.A1 ? 1499.00 : 2999.00;
+      return `${currency.symbol}${price.toLocaleString('en-IN')}`;
+  };
 
   const progressData = [
     { name: 'Vocab', score: 65 },
@@ -104,6 +101,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
                    </button>
                    <button onClick={() => onDevAction('reset')} className="w-full text-left text-sm px-3 py-2 bg-stone-800 hover:bg-stone-700 rounded text-red-400 flex items-center gap-2 transition-colors border border-stone-700">
                       <RotateCcw size={14} /> Reset Progress
+                   </button>
+                   <div className="h-px bg-stone-700 my-2"></div>
+                   <button onClick={() => onDevAction('open_admin')} className="w-full text-left text-sm px-3 py-2 bg-emerald-900 hover:bg-emerald-800 rounded text-emerald-100 flex items-center gap-2 transition-colors border border-emerald-700 font-bold">
+                      <ShieldAlert size={14} /> Open Admin Panel
                    </button>
                 </div>
              </div>
@@ -222,7 +223,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
 
             <div className="flex items-center justify-between border-b border-stone-300 pb-2 mb-4">
                <h2 className="text-2xl font-display text-stone-800">Your Itinerary</h2>
-               <span className="text-sm text-stone-500 italic">36 Missions to Fluency</span>
+               <span className="text-sm text-stone-500 italic">72 Missions to Fluency</span>
             </div>
             
             {Object.keys(groupedCurriculum).map((levelKey) => {
@@ -245,7 +246,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
                             className="!text-xs border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
                             onClick={() => onOpenLevelPurchase(typedLevel)}
                           >
-                            Buy Pack: {priceDisplay}
+                            Buy Pack: {getPriceDisplay(typedLevel)}
                           </Button>
                           {user.credits > 0 && (
                              <span className="text-[10px] text-[#059669] font-bold mt-1 flex items-center gap-1 animate-pulse">
@@ -263,8 +264,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
                          const prevModule = globalIndex > 0 ? CURRICULUM[globalIndex - 1] : null;
                          const isSequentiallyUnlocked = globalIndex === 0 || (prevModule && user.completedModules.includes(prevModule.id));
                          
-                         // LOGIC: Access (simplified: must own level)
-                         const isPaywalled = !isOwned;
+                         // LOGIC: Access
+                         // A module is free if it's explicitly unlocked (like A1.1-A1.6).
+                         // Otherwise, it's Paywalled if the Level is not Owned.
+                         const isFreeModule = user.unlockedModules.includes(module.id);
+                         const isPaywalled = !isOwned && !isFreeModule;
                          const isAccessible = isSequentiallyUnlocked && !isPaywalled;
                          const isCompleted = user.completedModules.includes(module.id);
                         
@@ -300,8 +304,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
                                   <div className="bg-amber-100 text-amber-800 px-4 py-2 rounded-full font-bold shadow-sm flex items-center gap-2 text-sm border border-amber-300 hover:scale-105 transition-transform">
                                      <CreditCard size={14} /> Buy Level {levelKey}
                                   </div>
-                               </div>
+                                </div>
                             )}
+
+                            {/* HOVER SYLLABUS OVERLAY */}
+                            <div className="absolute inset-0 bg-stone-900/95 backdrop-blur-sm p-6 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-center z-30 pointer-events-none">
+                              <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                                  <h4 className="text-[#059669] font-bold uppercase tracking-widest text-xs mb-3 flex items-center gap-2">
+                                    <Book size={14} /> Mission Syllabus
+                                  </h4>
+                                  <div className="mb-4">
+                                    <p className="text-[10px] text-stone-500 uppercase font-bold mb-1">Grammar Focus</p>
+                                    <ul className="text-sm space-y-1 text-stone-200">
+                                        {module.grammarFocus.map((gf, i) => (
+                                          <li key={i} className="flex items-start gap-2">
+                                            <span className="mt-1.5 w-1 h-1 bg-[#059669] rounded-full shrink-0"></span>
+                                            {gf}
+                                          </li>
+                                        ))}
+                                    </ul>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] text-stone-500 uppercase font-bold mb-1">Vocabulary Theme</p>
+                                    <p className="text-sm text-stone-200 flex items-center gap-2">
+                                        <MapPin size={14} className="text-stone-400" /> {module.vocabularyTheme}
+                                    </p>
+                                  </div>
+                              </div>
+                            </div>
 
                             <div className="flex items-center text-xs text-stone-400 gap-1">
                               <MapPin size={12} />

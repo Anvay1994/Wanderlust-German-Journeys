@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { UserProfile, GermanLevel } from '../types';
 import { INTERESTS_LIST } from '../constants';
 import Button from './Button';
-import { Plane, Map, Globe, BookOpen, CheckCircle2, GraduationCap, ArrowRight } from 'lucide-react';
+import { Plane, Map, Globe, BookOpen, CheckCircle2, GraduationCap, ArrowRight, Lock, Mail, Key } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface OnboardingProps {
   onComplete: (profile: UserProfile) => void;
@@ -52,27 +53,36 @@ const PLACEMENT_TEST = [
   {
     question: "9. Relative Pronouns: 'Das ist das Buch, ___ ich gelesen habe.'",
     options: ["dem", "der", "das", "den"],
-    correct: 2 // das (B2)
+    correct: 2 // B2
   },
   {
     question: "10. Passive Voice: 'Das Haus ___ im Jahr 1990 gebaut.' (was)",
     options: ["wurde", "war", "hat", "ist"],
-    correct: 0 // wurde (B2)
+    correct: 0 // B2
   },
   {
     question: "11. Genitive Prepositions: 'Wegen ___ Wetters blieben wir zu Hause.'",
     options: ["das schlechte", "des schlechten", "dem schlechten", "den schlechten"],
-    correct: 1 // des schlechten (C1)
+    correct: 1 // C1
   },
   {
     question: "12. Konjunktiv II: 'Wenn ich Zeit ___, würde ich kommen.' (had)",
     options: ["habe", "hätte", "habe gehabt", "hatte"],
-    correct: 1 // hätte (C1)
+    correct: 1 // C1
   }
 ];
 
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const [step, setStep] = useState(1);
+  
+  // Auth State
+  const [isLoginMode, setIsLoginMode] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // Profile State
   const [name, setName] = useState('');
   const [level, setLevel] = useState<GermanLevel>(GermanLevel.A1);
   const [interests, setInterests] = useState<string[]>([]);
@@ -91,21 +101,82 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     }
   };
 
-  const handleFinish = () => {
-    // Free modules: The first 3 of A1
-    const starterPack = ['A1.1', 'A1.2', 'A1.3'];
+  const handleAuth = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
 
-    onComplete({
-      name: name || 'Traveler',
-      level,
-      interests,
-      credits: 100, // Travel Tokens
-      xp: 0,
-      streak: 1,
-      completedModules: [],
-      unlockedModules: starterPack,
-      ownedLevels: [GermanLevel.A1] // A1 is free by default
-    });
+    try {
+      if (isLoginMode) {
+        // LOGIN
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        // App.tsx auth listener will handle the redirect
+      } else {
+        // SIGNUP - Wait for profile completion
+        // We just validate here, actual creation happens at the end
+        if (password.length < 6) throw new Error("Password must be at least 6 characters.");
+        setStep(2);
+      }
+    } catch (e: any) {
+      setAuthError(e.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleFinish = async () => {
+    setAuthLoading(true);
+    const starterPack = ['A1.1', 'A1.2', 'A1.3', 'A1.4', 'A1.5', 'A1.6'];
+    
+    try {
+      // 1. Create Auth User
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("No user created");
+
+      // 2. Create Profile Row
+      const newProfile = {
+        id: authData.user.id,
+        name: name || 'Traveler',
+        email: email,
+        level,
+        interests,
+        credits: 100,
+        xp: 0,
+        streak: 1,
+        completed_modules: [],
+        unlocked_modules: starterPack,
+        owned_levels: []
+      };
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert(newProfile);
+
+      if (profileError) throw profileError;
+
+      // 3. Complete
+      onComplete({
+        name: newProfile.name,
+        level: newProfile.level,
+        interests: newProfile.interests,
+        credits: newProfile.credits,
+        xp: newProfile.xp,
+        streak: newProfile.streak,
+        completedModules: [],
+        unlockedModules: starterPack,
+        ownedLevels: []
+      });
+
+    } catch (e: any) {
+      setAuthError(e.message);
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleOptionClick = (idx: number) => {
@@ -122,14 +193,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
   const calculateLevel = (finalScore: number) => {
     let assignedLevel = GermanLevel.A1;
-    
-    // Logic updated for 12 questions
     if (finalScore >= 3 && finalScore <= 5) assignedLevel = GermanLevel.A2;
     else if (finalScore >= 6 && finalScore <= 8) assignedLevel = GermanLevel.B1;
     else if (finalScore >= 9 && finalScore <= 10) assignedLevel = GermanLevel.B2;
     else if (finalScore >= 11) assignedLevel = GermanLevel.C1;
     
-    // Cap at C1 for now as C2 usually requires fluency beyond multiple choice
     if (finalScore === 12) assignedLevel = GermanLevel.C1; 
 
     setLevel(assignedLevel);
@@ -139,7 +207,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const skipToBeginner = () => {
     setLevel(GermanLevel.A1);
     setQuizFinished(true);
-    setQuizStarted(true); // To show the result screen directly
+    setQuizStarted(true);
   };
 
   return (
@@ -158,31 +226,89 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           <p className="text-stone-500 font-serif italic">Prepare for your journey to Germany</p>
         </div>
 
+        {/* STEP 1: CREDENTIALS */}
         {step === 1 && (
           <div className="space-y-6 animate-fade-in">
-            <div>
-              <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">Traveler Name</label>
-              <input 
-                type="text" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-stone-50 border-b-2 border-stone-300 text-stone-800 p-3 focus:border-[#059669] outline-none font-serif text-lg transition-colors placeholder:text-stone-300"
-                placeholder="Enter your name"
-              />
-            </div>
-            <Button onClick={() => setStep(2)} disabled={!name} className="w-full">
-              Begin Registration
-            </Button>
+             <div className="flex bg-stone-100 p-1 rounded-lg mb-6">
+                <button 
+                  onClick={() => { setIsLoginMode(false); setAuthError(null); }}
+                  className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${!isLoginMode ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
+                >
+                  New Traveler
+                </button>
+                <button 
+                  onClick={() => { setIsLoginMode(true); setAuthError(null); }}
+                  className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${isLoginMode ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
+                >
+                  Existing Passport
+                </button>
+             </div>
+
+             {authError && (
+               <div className="bg-red-50 text-red-600 p-3 text-sm rounded flex items-center gap-2">
+                 <Lock size={14}/> {authError}
+               </div>
+             )}
+
+             <div className="space-y-4">
+               {!isLoginMode && (
+                 <div>
+                    <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest mb-1">Name on Passport</label>
+                    <input 
+                      type="text" 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded p-3 focus:border-[#059669] outline-none"
+                      placeholder="e.g. Aditi Sharma"
+                    />
+                 </div>
+               )}
+               <div>
+                  <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest mb-1">Email Access</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3.5 text-stone-400" size={16} />
+                    <input 
+                      type="email" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded p-3 pl-10 focus:border-[#059669] outline-none"
+                      placeholder="name@example.com"
+                    />
+                  </div>
+               </div>
+               <div>
+                  <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest mb-1">Security Code</label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-3.5 text-stone-400" size={16} />
+                    <input 
+                      type="password" 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded p-3 pl-10 focus:border-[#059669] outline-none"
+                      placeholder="••••••••"
+                    />
+                  </div>
+               </div>
+             </div>
+
+             <Button 
+               onClick={handleAuth} 
+               disabled={!email || !password || (!isLoginMode && !name) || authLoading} 
+               className="w-full"
+             >
+                {authLoading ? 'Verifying...' : (isLoginMode ? 'Unlock Passport' : 'Create Identity')}
+             </Button>
           </div>
         )}
 
+        {/* STEP 2: PROFICIENCY */}
         {step === 2 && (
           <div className="animate-fade-in">
             {!quizStarted && !quizFinished && (
               <div className="text-center space-y-6">
                 <h2 className="text-xl text-stone-800 font-display">Proficiency Check</h2>
                 <p className="text-stone-600">
-                  To give you the best experience, we need to know how much German you already know.
+                  Welcome, {name}. Before we print your visa, let's check your German level.
                 </p>
                 <div className="space-y-3">
                   <Button onClick={() => setQuizStarted(true)} className="w-full">
@@ -232,7 +358,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                   <p className="text-xs text-stone-400 uppercase tracking-widest">
                     {level === GermanLevel.A1 ? "Beginner" : level === GermanLevel.B2 || level === GermanLevel.C1 ? "Advanced" : "Intermediate"}
                   </p>
-                  <p className="text-sm text-stone-400 mt-2">Score: {score}/{PLACEMENT_TEST.length}</p>
                 </div>
                 <Button onClick={() => setStep(3)} className="w-full">
                   Confirm & Continue
@@ -242,12 +367,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           </div>
         )}
 
+        {/* STEP 3: INTERESTS & FINISH */}
         {step === 3 && (
           <div className="space-y-6 animate-fade-in">
              <h2 className="text-xl text-stone-800 font-display flex items-center gap-2">
                <Map className="w-5 h-5 text-[#059669]" /> Travel Interests
              </h2>
-             <p className="text-sm text-stone-500">We will customize your itinerary based on what you love.</p>
+             <p className="text-sm text-stone-500">Customize your itinerary.</p>
              <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                {INTERESTS_LIST.map(interest => (
                  <button
@@ -259,8 +385,15 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                  </button>
                ))}
              </div>
-             <Button onClick={handleFinish} className="w-full" variant="primary">
-               Print Passport
+             
+             {authError && (
+               <div className="bg-red-50 text-red-600 p-2 text-xs rounded">
+                 {authError}
+               </div>
+             )}
+
+             <Button onClick={handleFinish} className="w-full" variant="primary" disabled={authLoading}>
+               {authLoading ? 'Printing Passport...' : 'Start Adventure'}
              </Button>
           </div>
         )}

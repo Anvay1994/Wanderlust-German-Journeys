@@ -24,6 +24,7 @@ const shouldShowContent = (contentLevel: GermanLevel, userLevel: GermanLevel): b
   const levels = [GermanLevel.A1, GermanLevel.A2, GermanLevel.B1, GermanLevel.B2, GermanLevel.C1, GermanLevel.C2];
   const contentIdx = levels.indexOf(contentLevel);
   const userIdx = levels.indexOf(userLevel);
+  // Higher level users can see all lower level content
   return contentIdx <= userIdx;
 };
 
@@ -99,10 +100,10 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
 
   // --- EXHAUSTIVE GRAMMAR CONTENT ---
   const TEXTBOOK_CHAPTERS: GrammarSection[] = [
-    // === A1 CONTENT ===
+    // === A1 CONTENT (Static & Dynamic) ===
     {
       id: 'nouns-articles',
-      title: '1. Nouns & Articles',
+      title: 'A1: Nouns & Articles',
       level: GermanLevel.A1,
       content: (
         <div className="space-y-6">
@@ -142,11 +143,12 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
             <span className="text-[#059669] font-bold">PRO TIP:</span> All plural nouns use the article <strong>Die</strong> (in Nominative).
           </div>
         </div>
-      )
+      ),
+      isDynamic: false
     },
     {
       id: 'personal-pronouns',
-      title: '2. Personal Pronouns',
+      title: 'A1: Personal Pronouns',
       level: GermanLevel.A1,
       content: (
         <div className="space-y-6">
@@ -174,11 +176,12 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
              </table>
            </div>
         </div>
-      )
+      ),
+      isDynamic: false
     },
     {
       id: 'sein-haben',
-      title: '3. Sein & Haben',
+      title: 'A1: Sein & Haben',
       level: GermanLevel.A1,
       content: (
         <div className="space-y-6">
@@ -212,11 +215,12 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
              </div>
           </div>
         </div>
-      )
+      ),
+      isDynamic: false
     },
     {
       id: 'regular-verbs',
-      title: '4. Regular Verbs',
+      title: 'A1: Regular Verbs',
       level: GermanLevel.A1,
       content: (
         <div className="space-y-6">
@@ -235,11 +239,12 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
              </tbody>
           </table>
         </div>
-      )
+      ),
+      isDynamic: false
     },
     {
       id: 'negation',
-      title: '5. Negation (Nicht vs Kein)',
+      title: 'A1: Negation (Nicht/Kein)',
       level: GermanLevel.A1,
       content: (
         <div className="space-y-6">
@@ -263,11 +268,12 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
             </div>
           </div>
         </div>
-      )
+      ),
+      isDynamic: false
     },
     {
       id: 'questions',
-      title: '6. W-Questions',
+      title: 'A1: W-Questions',
       level: GermanLevel.A1,
       content: (
         <div className="space-y-6">
@@ -286,9 +292,18 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
               <p className="text-sm text-emerald-700">Where do you live?</p>
            </div>
         </div>
-      )
+      ),
+      isDynamic: false
     },
-    // A2 Placeholder (Sentence structure, etc.)
+    // A1 Dynamic Extensions
+    { id: 'a1-accusative', title: 'A1: The Accusative Case', level: GermanLevel.A1, content: null, isDynamic: true },
+    { id: 'a1-modals', title: 'A1: Modal Verbs (Können/Müssen)', level: GermanLevel.A1, content: null, isDynamic: true },
+    { id: 'a1-plural', title: 'A1: Plural Forms', level: GermanLevel.A1, content: null, isDynamic: true },
+    { id: 'a1-separable', title: 'A1: Separable Verbs', level: GermanLevel.A1, content: null, isDynamic: true },
+    { id: 'a1-imperative', title: 'A1: The Imperative', level: GermanLevel.A1, content: null, isDynamic: true },
+    { id: 'a1-perfect', title: 'A1: Introduction to Perfect Tense', level: GermanLevel.A1, content: null, isDynamic: true },
+
+    // === A2 CONTENT ===
      {
       id: 'sentence-structure-a2',
       title: 'A2: Sentence Structure',
@@ -309,20 +324,50 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
               </div>
            </div>
         </div>
-      )
+      ),
+      isDynamic: false
     },
-    // B1 Dynamic Topics
-    { id: 'b1-prepositions', title: 'B1: Genitive Prepositions', level: GermanLevel.B1, content: null, isDynamic: true },
-    { id: 'b1-adjectives', title: 'B1: Adjective Endings', level: GermanLevel.B1, content: null, isDynamic: true },
-    { id: 'b1-future', title: 'B1: Future I', level: GermanLevel.B1, content: null, isDynamic: true },
-    // B2 Dynamic Topics
-    { id: 'b2-passive', title: 'B2: Passive Voice', level: GermanLevel.B2, content: null, isDynamic: true },
-    { id: 'b2-indirect', title: 'B2: Indirect Speech', level: GermanLevel.B2, content: null, isDynamic: true },
-    // C1 Dynamic Topics
-    { id: 'c1-nominalization', title: 'C1: Nominalization', level: GermanLevel.C1, content: null, isDynamic: true },
-    { id: 'c1-subjunctive', title: 'C1: Konjunktiv I', level: GermanLevel.C1, content: null, isDynamic: true },
-    // C2 Dynamic Topics
-    { id: 'c2-dialects', title: 'C2: Dialects & Nuances', level: GermanLevel.C2, content: null, isDynamic: true },
+    { id: 'a2-dative', title: 'A2: The Dative Case', level: GermanLevel.A2, content: null, isDynamic: true },
+    { id: 'a2-prepositions-dat', title: 'A2: Prepositions with Dative', level: GermanLevel.A2, content: null, isDynamic: true },
+    { id: 'a2-prepositions-switch', title: 'A2: Two-Way Prepositions (Wechselpräpositionen)', level: GermanLevel.A2, content: null, isDynamic: true },
+    { id: 'a2-past-praeteritum', title: 'A2: Simple Past (Präteritum) - Basics', level: GermanLevel.A2, content: null, isDynamic: true },
+    { id: 'a2-reflexive', title: 'A2: Reflexive Verbs', level: GermanLevel.A2, content: null, isDynamic: true },
+    { id: 'a2-adj-endings', title: 'A2: Adjective Endings', level: GermanLevel.A2, content: null, isDynamic: true },
+    { id: 'a2-comparison', title: 'A2: Comparative & Superlative', level: GermanLevel.A2, content: null, isDynamic: true },
+    { id: 'a2-subordinate', title: 'A2: Subordinate Clauses (weil/dass)', level: GermanLevel.A2, content: null, isDynamic: true },
+
+    // === B1 CONTENT ===
+    { id: 'b1-genitive', title: 'B1: The Genitive Case', level: GermanLevel.B1, content: null, isDynamic: true },
+    { id: 'b1-passive-present', title: 'B1: Passive Voice (Present)', level: GermanLevel.B1, content: null, isDynamic: true },
+    { id: 'b1-passive-past', title: 'B1: Passive Voice (Past)', level: GermanLevel.B1, content: null, isDynamic: true },
+    { id: 'b1-relative', title: 'B1: Relative Clauses', level: GermanLevel.B1, content: null, isDynamic: true },
+    { id: 'b1-infinitive-zu', title: 'B1: Infinitive with "zu"', level: GermanLevel.B1, content: null, isDynamic: true },
+    { id: 'b1-prepositions-gen', title: 'B1: Prepositions with Genitive', level: GermanLevel.B1, content: null, isDynamic: true },
+    { id: 'b1-konjunktiv-ii', title: 'B1: Konjunktiv II (Wishes & Politeness)', level: GermanLevel.B1, content: null, isDynamic: true },
+    { id: 'b1-n-declension', title: 'B1: N-Declension', level: GermanLevel.B1, content: null, isDynamic: true },
+    { id: 'b1-future', title: 'B1: Future I Tense', level: GermanLevel.B1, content: null, isDynamic: true },
+
+    // === B2 CONTENT ===
+    { id: 'b2-past-perfect', title: 'B2: Past Perfect (Plusquamperfekt)', level: GermanLevel.B2, content: null, isDynamic: true },
+    { id: 'b2-passive-modal', title: 'B2: Passive with Modal Verbs', level: GermanLevel.B2, content: null, isDynamic: true },
+    { id: 'b2-participles', title: 'B2: Participles as Adjectives', level: GermanLevel.B2, content: null, isDynamic: true },
+    { id: 'b2-connectors', title: 'B2: Two-part Connectors (je...desto, zwar...aber)', level: GermanLevel.B2, content: null, isDynamic: true },
+    { id: 'b2-verbs-prepositions', title: 'B2: Verbs with Fixed Prepositions', level: GermanLevel.B2, content: null, isDynamic: true },
+    { id: 'b2-word-formation', title: 'B2: Noun Formation (Nominalization Basics)', level: GermanLevel.B2, content: null, isDynamic: true },
+
+    // === C1 CONTENT ===
+    { id: 'c1-konjunktiv-i', title: 'C1: Indirect Speech (Konjunktiv I)', level: GermanLevel.C1, content: null, isDynamic: true },
+    { id: 'c1-nominal-style', title: 'C1: Nominal Style vs Verbal Style', level: GermanLevel.C1, content: null, isDynamic: true },
+    { id: 'c1-participle-constructions', title: 'C1: Extended Participle Constructions', level: GermanLevel.C1, content: null, isDynamic: true },
+    { id: 'c1-subjunctive-past', title: 'C1: Konjunktiv II (Past Situations)', level: GermanLevel.C1, content: null, isDynamic: true },
+    { id: 'c1-advanced-passive', title: 'C1: Passive Substitutes (sein + zu, lassen)', level: GermanLevel.C1, content: null, isDynamic: true },
+
+    // === C2 CONTENT ===
+    { id: 'c2-dialects', title: 'C2: German Dialects (Bairisch, Berlinerisch)', level: GermanLevel.C2, content: null, isDynamic: true },
+    { id: 'c2-particles', title: 'C2: Modal Particles (doch, mal, eben, halt)', level: GermanLevel.C2, content: null, isDynamic: true },
+    { id: 'c2-rhetoric', title: 'C2: Rhetorical Devices', level: GermanLevel.C2, content: null, isDynamic: true },
+    { id: 'c2-nuance', title: 'C2: Nuances in Synonyms', level: GermanLevel.C2, content: null, isDynamic: true },
+    { id: 'c2-idioms', title: 'C2: Advanced Idiomatic Expressions', level: GermanLevel.C2, content: null, isDynamic: true },
   ];
 
   const filteredChapters = useMemo(() => {

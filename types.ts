@@ -5,7 +5,8 @@ export enum AppState {
   GAME_SESSION = 'GAME_SESSION',
   PROFILE = 'PROFILE',
   STORE = 'STORE',
-  GUIDEBOOK = 'GUIDEBOOK'
+  GUIDEBOOK = 'GUIDEBOOK',
+  ADMIN = 'ADMIN'
 }
 
 export enum GermanLevel {

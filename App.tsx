@@ -6,31 +6,82 @@ import Dashboard from './components/Dashboard';
 import GameSession from './components/GameSession';
 import StoreModal from './components/StoreModal';
 import Guidebook from './components/Guidebook';
+import AdminConsole from './components/AdminConsole';
+import { Loader2 } from 'lucide-react';
+import { supabase, mapProfileToUser, updateUserProfile, recordPurchase } from './services/supabaseClient';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.ONBOARDING);
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [activeModule, setActiveModule] = useState<CurriculumModule | null>(null);
   const [showStore, setShowStore] = useState(false);
   const [preSelectedLevel, setPreSelectedLevel] = useState<GermanLevel | null>(null);
 
-  // Load user from local storage (mock persistence)
+  // SUPABASE AUTH INITIALIZATION
   useEffect(() => {
-    const savedUser = localStorage.getItem('neon_berlin_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      setAppState(AppState.DASHBOARD);
-    }
+    const initSession = async () => {
+      // 1. Check active session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        setUserId(session.user.id);
+        await fetchUserProfile(session.user.id);
+      } else {
+        setIsLoading(false);
+        setAppState(AppState.ONBOARDING);
+      }
+
+      // 2. Listen for auth changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (session) {
+          setUserId(session.user.id);
+          await fetchUserProfile(session.user.id);
+        } else {
+          setUser(null);
+          setUserId(null);
+          setAppState(AppState.ONBOARDING);
+          setIsLoading(false);
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    };
+
+    initSession();
   }, []);
 
+  const fetchUserProfile = async (uid: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', uid)
+        .single();
+
+      if (error) throw error;
+      
+      if (data) {
+        setUser(mapProfileToUser(data));
+        setAppState(AppState.DASHBOARD);
+      } else {
+        // User is authed but has no profile row (rare edge case, or during onboarding)
+        setAppState(AppState.ONBOARDING);
+      }
+    } catch (e) {
+      console.error("Profile fetch error:", e);
+      setAppState(AppState.ONBOARDING);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleOnboardingComplete = (profile: UserProfile) => {
-    // Ensure A1 is owned by default if not specified
-    const initializedProfile = {
-      ...profile,
-      ownedLevels: profile.ownedLevels && profile.ownedLevels.length > 0 ? profile.ownedLevels : [GermanLevel.A1]
-    };
-    setUser(initializedProfile);
-    localStorage.setItem('neon_berlin_user', JSON.stringify(initializedProfile));
+    // Optimistic update for UI immediate response
+    // The actual DB insertion happened inside Onboarding.tsx
+    setUser(profile);
     setAppState(AppState.DASHBOARD);
   };
 
@@ -40,34 +91,57 @@ const App: React.FC = () => {
   };
 
   const handleExitSession = (xpEarned: number, completed: boolean) => {
-    if (user && activeModule) {
+    if (user && activeModule && userId) {
+      const newCompletedModules = completed 
+          ? Array.from(new Set([...user.completedModules, activeModule.id]))
+          : user.completedModules;
+
+      const newCredits = user.credits + (completed ? 20 : 5);
+      const newXp = user.xp + xpEarned;
+
       const updatedUser = { 
         ...user, 
-        xp: user.xp + xpEarned,
-        credits: user.credits + (completed ? 20 : 5), // Earn tokens for playing
-        completedModules: completed 
-          ? Array.from(new Set([...user.completedModules, activeModule.id]))
-          : user.completedModules
+        xp: newXp,
+        credits: newCredits,
+        completedModules: newCompletedModules
       };
+      
+      // 1. Optimistic Update
       setUser(updatedUser);
-      localStorage.setItem('neon_berlin_user', JSON.stringify(updatedUser));
+      
+      // 2. DB Update
+      updateUserProfile(userId, {
+        xp: newXp,
+        credits: newCredits,
+        completedModules: newCompletedModules
+      });
     }
     setActiveModule(null);
     setAppState(AppState.DASHBOARD);
   };
 
   const handlePurchaseLevel = (level: GermanLevel, tokensRedeemed: number) => {
-    if (user) {
+    if (user && userId) {
+      const newCredits = Math.max(0, user.credits - tokensRedeemed);
+      const newOwned = [...user.ownedLevels, level];
+
       const updatedUser = { 
         ...user, 
-        credits: Math.max(0, user.credits - tokensRedeemed), 
-        ownedLevels: [...user.ownedLevels, level] 
+        credits: newCredits, 
+        ownedLevels: newOwned 
       };
+      
+      // Optimistic
       setUser(updatedUser);
-      localStorage.setItem('neon_berlin_user', JSON.stringify(updatedUser));
+      
+      // DB Updates
+      updateUserProfile(userId, { credits: newCredits, ownedLevels: newOwned });
+      
+      // Record revenue (Mocking INR price logic here for record keeping)
+      const price = level === GermanLevel.A1 ? 1499 : 2999;
+      recordPurchase(userId, `LEVEL_${level}`, price - tokensRedeemed);
+      
       setPreSelectedLevel(null);
-      // Keep store open or close it? Let's close it to show success on dashboard
-      setShowStore(false);
     }
   };
 
@@ -77,21 +151,29 @@ const App: React.FC = () => {
   };
 
   const handleUnlockModule = (moduleId: string, cost: number) => {
-    // Legacy support for individual modules if needed, keeping for type safety
-    if (user && user.credits >= cost) {
+    if (user && user.credits >= cost && userId) {
+      const newCredits = user.credits - cost;
+      const newUnlocked = [...user.unlockedModules, moduleId];
+
       const updatedUser = {
         ...user,
-        credits: user.credits - cost,
-        unlockedModules: [...user.unlockedModules, moduleId]
+        credits: newCredits,
+        unlockedModules: newUnlocked
       };
+      
       setUser(updatedUser);
-      localStorage.setItem('neon_berlin_user', JSON.stringify(updatedUser));
+      updateUserProfile(userId, { credits: newCredits, unlockedModules: newUnlocked });
     }
   };
 
   // --- DEV / TESTING TOOLS ---
-  const handleDevAction = (action: 'add_credits' | 'unlock_all' | 'reset') => {
-    if (!user) return;
+  const handleDevAction = async (action: 'add_credits' | 'unlock_all' | 'reset' | 'open_admin') => {
+    if (action === 'open_admin') {
+      setAppState(AppState.ADMIN);
+      return;
+    }
+
+    if (!user || !userId) return;
     
     let updatedUser = { ...user };
     
@@ -100,11 +182,9 @@ const App: React.FC = () => {
     } 
     else if (action === 'unlock_all') {
       updatedUser.ownedLevels = Object.values(GermanLevel);
-      // Mark all modules as completed to bypass sequential locks for testing
       updatedUser.completedModules = CURRICULUM.map(m => m.id);
     } 
     else if (action === 'reset') {
-       // Keep name and interests, reset progress
        updatedUser = {
          ...updatedUser,
          level: GermanLevel.A1,
@@ -112,14 +192,22 @@ const App: React.FC = () => {
          xp: 0,
          streak: 1,
          completedModules: [],
-         unlockedModules: ['A1.1', 'A1.2', 'A1.3'],
-         ownedLevels: [GermanLevel.A1]
+         unlockedModules: ['A1.1', 'A1.2', 'A1.3', 'A1.4', 'A1.5', 'A1.6'],
+         ownedLevels: []
        };
     }
     
     setUser(updatedUser);
-    localStorage.setItem('neon_berlin_user', JSON.stringify(updatedUser));
+    await updateUserProfile(userId, updatedUser);
   };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen bg-[#f5f5f4] flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-[#059669] animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="font-sans text-white">
@@ -162,6 +250,10 @@ const App: React.FC = () => {
           onBack={() => setAppState(AppState.DASHBOARD)} 
           level={user.level}
         />
+      )}
+      
+      {appState === AppState.ADMIN && (
+        <AdminConsole onExit={() => setAppState(AppState.DASHBOARD)} />
       )}
     </div>
   );
