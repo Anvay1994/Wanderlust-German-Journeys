@@ -78,28 +78,31 @@ export const generateMissionBriefing = async (
   const model = "gemini-2.5-flash";
   const prompt = `
     Create a COMPREHENSIVE educational dossier for a German learner before a mission.
-    It must act as a mini-lesson for the specific grammar concept.
+    It must act as a detailed mini-lesson for the specific grammar concept.
 
     Module: ${module.title} (${module.level})
     Grammar Focus: ${module.grammarFocus.join(', ')}
     Vocab Theme: ${module.vocabularyTheme}
 
     Output JSON with:
-    1. vocabulary: 8 essential words (German/English).
-    2. lesson:
+    1. missionGoal: A 1-sentence strategic objective for the learner in this specific scenario (e.g. "Master the verb 'sein' to confidently introduce yourself at the border.").
+    2. vocabulary: 8 essential words (German/English).
+    3. lesson:
        - title: The specific Grammar Rule name.
-       - explanation: A clear, academic but easy explanation (max 3 sentences).
-       - example: A sentence demonstrating the rule.
+       - explanation: A detailed, step-by-step explanation of the rule. Explain *how* it works and *when* to use it. (approx 3-4 sentences).
+       - keyPoints: 3 concise bullet points summarizing the most important takeaways.
+       - example: A sentence demonstrating the rule in the context of the mission.
        - grammarTable: A structured table to visualize the rule. Must include 'headers' (list of strings) and 'rows' (list of lists of strings).
        - commonMistakes: 2-3 common errors learners make with this specific rule.
-    3. keyPhrases: 4 useful sentences for the scenario.
-    4. culturalFact: A fascinating tidbit about Germany related to the scenario.
-    5. quiz: One tricky multiple-choice question testing the *Grammar Rule*.
+    4. keyPhrases: 4 useful sentences for the scenario.
+    5. culturalFact: A fascinating tidbit about Germany related to the scenario.
+    6. quiz: One tricky multiple-choice question testing the *Grammar Rule*.
   `;
 
   const schema = {
     type: Type.OBJECT,
     properties: {
+      missionGoal: { type: Type.STRING },
       vocabulary: {
         type: Type.ARRAY,
         items: {
@@ -112,6 +115,7 @@ export const generateMissionBriefing = async (
         properties: { 
           title: { type: Type.STRING }, 
           explanation: { type: Type.STRING },
+          keyPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
           example: { type: Type.STRING },
           grammarTable: {
             type: Type.OBJECT,
@@ -157,14 +161,13 @@ export const generateMissionBriefing = async (
     const data = JSON.parse(response.text || "{}");
     
     // PARTIAL RECOVERY STRATEGY
-    // Even if Gemini returns incomplete data (e.g. only vocabulary), we use what we have
-    // and fill the rest with safe defaults to prevent app crashes.
-
     const safeBriefing: MissionBriefing = {
+        missionGoal: data.missionGoal || `Master ${module.grammarFocus[0]} to complete your mission.`,
         vocabulary: Array.isArray(data.vocabulary) ? data.vocabulary : [],
         lesson: {
             title: data.lesson?.title || module.title,
             explanation: data.lesson?.explanation || `Focus on ${module.grammarFocus[0]} and prepare for your mission.`,
+            keyPoints: Array.isArray(data.lesson?.keyPoints) ? data.lesson.keyPoints : ["Review the grammar table.", "Watch out for exceptions.", "Practice the example sentence."],
             example: data.lesson?.example || "",
             grammarTable: data.lesson?.grammarTable || { headers: [], rows: [] },
             commonMistakes: Array.isArray(data.lesson?.commonMistakes) ? data.lesson.commonMistakes : []
@@ -178,14 +181,12 @@ export const generateMissionBriefing = async (
         }
     };
 
-    // Sanity check for Grammar Table structure
     if (safeBriefing.lesson.grammarTable) {
         if (!Array.isArray(safeBriefing.lesson.grammarTable.headers) || !Array.isArray(safeBriefing.lesson.grammarTable.rows)) {
             safeBriefing.lesson.grammarTable = { headers: [], rows: [] };
         }
     }
 
-    // Only fail if we have ZERO useful content
     if (safeBriefing.vocabulary.length === 0 && safeBriefing.keyPhrases.length === 0 && !data.lesson) {
         console.warn("Gemini response empty:", data);
         throw new Error("Briefing data completely empty");
@@ -196,10 +197,12 @@ export const generateMissionBriefing = async (
     console.warn("Gemini Error or Validation Failure (using fallback):", e);
     // Hard Fallback data if API fails completely
     return {
+      missionGoal: "Master the basics of communication to navigate your arrival.",
       vocabulary: [{ german: 'Hallo', english: 'Hello' }, { german: 'Danke', english: 'Thank you' }],
       lesson: { 
         title: 'Mission Basics', 
-        explanation: 'Review your vocabulary and prepare for the conversation.', 
+        explanation: 'German verbs change their ending depending on who is speaking (conjugation). The formal "Sie" is essential for polite interactions with strangers.', 
+        keyPoints: ["Verbs change based on the person.", "Formal 'Sie' is used for strangers.", "The verb is usually in position 2."],
         example: 'Guten Tag, wie geht es Ihnen?', 
         commonMistakes: ['Forgetting to capitalize nouns', 'Mixing up Du and Sie'],
         grammarTable: {

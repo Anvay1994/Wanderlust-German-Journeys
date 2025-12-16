@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CurriculumModule, MissionBriefing } from '../types';
 import { generateMissionBriefing } from '../services/geminiService';
 import Button from './Button';
-import { Loader2, Book, Lightbulb, MessageCircle, ArrowRight, Lock, CheckCircle, Volume2, ShieldCheck, FileText, AlertTriangle, PenTool } from 'lucide-react';
+import { Loader2, Book, Lightbulb, MessageCircle, ArrowRight, Lock, CheckCircle, Volume2, ShieldCheck, FileText, AlertTriangle, PenTool, Target, CheckSquare } from 'lucide-react';
 
 interface MissionPrepProps {
   module: CurriculumModule;
@@ -90,6 +90,15 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                      <h3 className="text-2xl font-display font-bold text-stone-800">Mission Intel</h3>
                      <p className="text-stone-500">Equip yourself with these essential terms.</p>
                    </div>
+                   
+                   {briefing.missionGoal && (
+                     <div className="bg-white border-l-4 border-amber-400 p-4 mb-8 rounded shadow-sm max-w-3xl mx-auto w-full">
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-amber-600 flex items-center gap-2 mb-1">
+                          <Target size={14} /> Mission Objective
+                        </h4>
+                        <p className="text-stone-700 italic">{briefing.missionGoal}</p>
+                     </div>
+                   )}
 
                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
                       {briefing.vocabulary?.map((item, idx) => (
@@ -134,8 +143,26 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                                 <h3 className="font-bold flex items-center gap-2"><Lightbulb size={18} /> Protocol: {briefing.lesson?.title}</h3>
                              </div>
                              <div className="p-6">
-                                <p className="text-lg text-stone-700 leading-relaxed mb-6">{briefing.lesson?.explanation}</p>
+                                <p className="text-lg text-stone-700 leading-relaxed mb-6 whitespace-pre-line">
+                                   {briefing.lesson?.explanation}
+                                </p>
                                 
+                                {briefing.lesson.keyPoints && briefing.lesson.keyPoints.length > 0 && (
+                                   <div className="mb-6 bg-stone-50 p-4 rounded border border-stone-100">
+                                      <h4 className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-3 flex items-center gap-2">
+                                         <CheckSquare size={14} /> Key Takeaways
+                                      </h4>
+                                      <ul className="space-y-2">
+                                         {briefing.lesson.keyPoints.map((point, idx) => (
+                                            <li key={idx} className="flex gap-2 items-start text-stone-700">
+                                               <span className="text-[#059669] mt-1 font-bold">•</span>
+                                               {point}
+                                            </li>
+                                         ))}
+                                      </ul>
+                                   </div>
+                                )}
+
                                 <div className="bg-emerald-50 border-l-4 border-[#059669] p-4 mb-6">
                                    <span className="text-xs font-bold text-emerald-800 uppercase tracking-widest mb-1 block">Primary Example</span>
                                    <div className="flex items-center justify-between">

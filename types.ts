@@ -70,9 +70,11 @@ export interface SuggestedResponse {
 
 export interface MissionBriefing {
   vocabulary: { german: string; english: string }[];
+  missionGoal?: string; // Strategic objective for the context
   lesson: {
     title: string;
     explanation: string;
+    keyPoints?: string[]; // Bullet points for better readability
     example: string;
     // New fields for detailed class-like structure
     grammarTable?: { headers: string[], rows: string[][] }; 

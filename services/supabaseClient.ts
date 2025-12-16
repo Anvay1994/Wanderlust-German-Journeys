@@ -4,7 +4,7 @@ import { UserProfile, GermanLevel } from '../types';
 // Access environment variables with hardcoded fallbacks from your provided env.txt
 // This ensures the app works immediately even if the .env file isn't being read correctly.
 const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bzwdxfjdrkoomzsvpidk.supabase.co';
-const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_OkE90DwzmmKJLPoE9OukCQ_YpiyXHxN';
+const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_65nX0uP7fuAm1ZDOd-LDUg_oZa46Mqm';
 
 // Initialize the Supabase client
 export const supabase = (supabaseUrl && supabaseAnonKey) 
