@@ -71,7 +71,7 @@ export const updateUserProfile = async (userId: string, updates: Partial<UserPro
     .eq('id', userId);
 
   if (error) {
-    console.error('Error updating profile:', error);
+    console.error('Error updating profile:', JSON.stringify(error, null, 2));
   }
 };
 
@@ -89,6 +89,6 @@ export const recordPurchase = async (userId: string, description: string, amount
     });
     
   if (error) {
-    console.error('Purchase record failed:', error);
+    console.error('Purchase record failed:', JSON.stringify(error, null, 2));
   }
 };

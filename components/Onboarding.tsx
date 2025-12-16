@@ -182,7 +182,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onGuestLogin }) => 
         completed_modules: [],
         unlocked_modules: starterPack,
         owned_levels: [],
-        last_active_at: new Date().toISOString()
+        last_active: new Date().toISOString()
       };
 
       const { error: updateError, data: updateData } = await supabase
