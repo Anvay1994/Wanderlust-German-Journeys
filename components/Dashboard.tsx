@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { UserProfile, CurriculumModule, GermanLevel } from '../types';
 import { CURRICULUM } from '../constants';
 import Button from './Button';
-import { Lock, CheckCircle2, Coins, MapPin, TrendingUp, Book, Compass, HelpCircle, X, Zap, Ticket, CreditCard, Tag, Terminal, PlusCircle, Unlock, RotateCcw, ShieldAlert } from 'lucide-react';
+import { Lock, CheckCircle2, Coins, MapPin, TrendingUp, Book, Compass, HelpCircle, X, Zap, Ticket, CreditCard, Tag, Terminal, PlusCircle, Unlock, RotateCcw, ShieldAlert, Dumbbell, Type, Hash } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface DashboardProps {
@@ -62,19 +62,49 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
   const GuidebookCard = (
     <div 
       onClick={onOpenGuidebook}
-      className="bg-[#059669] text-white p-6 rounded-lg cursor-pointer hover:bg-[#047857] transition-all shadow-md group relative overflow-hidden mb-6"
+      className="bg-[#059669] text-white p-6 rounded-lg cursor-pointer hover:bg-[#047857] transition-all shadow-md group relative overflow-hidden mb-6 border-b-4 border-[#047857]"
     >
-       <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 transition-transform">
-          <Compass size={80} />
+       {/* Decorative Pattern Background */}
+       <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/notebook.png')]"></div>
+       
+       <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500 rotate-12">
+          <Compass size={140} />
        </div>
+
        <div className="relative z-10">
-         <h3 className="text-lg font-display font-bold mb-2 flex items-center gap-2">
-           <Book size={20} /> Pocket Guide
-         </h3>
-         <p className="text-emerald-100 text-sm mb-4 max-w-md">
-           Reference Handbook, Grammar Rules, and Vocabulary for all levels.
-         </p>
-         <Button size="sm" className="bg-white text-[#059669] hover:bg-emerald-50 border-none w-full sm:w-auto">Open Guide</Button>
+         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+               <h3 className="text-2xl font-display font-bold mb-1 flex items-center gap-2 text-white">
+                 <Book size={24} className="text-emerald-100" /> Pocket Guide
+               </h3>
+               <p className="text-emerald-50 text-sm max-w-md font-serif italic opacity-90">
+                 "A traveler without knowledge is a bird without wings."
+               </p>
+            </div>
+            <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full border border-white/30 text-xs font-bold uppercase tracking-widest hover:bg-white/30 transition-colors">
+               Open Field Manual
+            </div>
+         </div>
+
+         {/* Visible Contents Grid - Tactile Paper Tags Style */}
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { icon: Book, label: 'Grammar', sub: 'Rules & Tables' },
+              { icon: Dumbbell, label: 'Drills', sub: 'Daily Practice' },
+              { icon: Type, label: 'Alphabet', sub: 'Pronunciation' },
+              { icon: Hash, label: 'Numbers', sub: 'Counting' }
+            ].map((item, idx) => (
+              <div key={idx} className="bg-[#fffbeb] text-stone-800 p-3 rounded shadow-sm border-2 border-transparent hover:border-emerald-300 transition-all transform hover:-translate-y-0.5 group-hover:shadow-md flex items-center gap-3">
+                 <div className="bg-emerald-100 text-[#059669] p-2 rounded-full">
+                    <item.icon size={18} />
+                 </div>
+                 <div>
+                    <span className="block text-sm font-bold leading-tight">{item.label}</span>
+                    <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wide">{item.sub}</span>
+                 </div>
+              </div>
+            ))}
+         </div>
        </div>
     </div>
   );

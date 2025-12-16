@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { UserProfile, GermanLevel } from '../types';
 import { INTERESTS_LIST } from '../constants';
 import Button from './Button';
-import { Plane, Map, Globe, BookOpen, CheckCircle2, GraduationCap, ArrowRight, Lock, Mail, Key } from 'lucide-react';
+import { Plane, Map, Globe, BookOpen, CheckCircle2, GraduationCap, ArrowRight, Lock, Mail, Key, UserCircle2 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { useSoundEffects } from '../hooks/useSoundEffects';
 
 interface OnboardingProps {
   onComplete: (profile: UserProfile) => void;
+  onGuestLogin?: () => void;
 }
 
 const PLACEMENT_TEST = [
@@ -72,7 +74,8 @@ const PLACEMENT_TEST = [
   }
 ];
 
-const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
+const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onGuestLogin }) => {
+  const { playSound } = useSoundEffects();
   const [step, setStep] = useState(1);
   
   // Auth State
@@ -81,6 +84,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   // Profile State
   const [name, setName] = useState('');
@@ -94,6 +98,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const [quizFinished, setQuizFinished] = useState(false);
 
   const toggleInterest = (interest: string) => {
+    playSound('click', 0.5);
     if (interests.includes(interest)) {
       setInterests(interests.filter(i => i !== interest));
     } else {
@@ -104,20 +109,29 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const handleAuth = async () => {
     setAuthLoading(true);
     setAuthError(null);
+    setEmailSent(false);
 
     try {
       if (isLoginMode) {
         // LOGIN
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+           if (error.message.includes("Email not confirmed")) {
+             setAuthError("Email not verified. Please check your inbox.");
+           } else {
+             throw error;
+           }
+        }
+        playSound('success', 0.5);
         // App.tsx auth listener will handle the redirect
       } else {
-        // SIGNUP - Wait for profile completion
-        // We just validate here, actual creation happens at the end
+        // SIGNUP - Validate input before moving to step 2
         if (password.length < 6) throw new Error("Password must be at least 6 characters.");
+        playSound('paper', 0.5);
         setStep(2);
       }
     } catch (e: any) {
+      playSound('error', 0.5);
       setAuthError(e.message);
     } finally {
       setAuthLoading(false);
@@ -129,18 +143,35 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const starterPack = ['A1.1', 'A1.2', 'A1.3', 'A1.4', 'A1.5', 'A1.6'];
     
     try {
-      // 1. Create Auth User
+      // 1. Create Auth User AND Pass Metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: name || 'Traveler',
+            current_level: level,
+            interests: interests
+          }
+        }
       });
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("No user created");
 
-      // 2. Create Profile Row (Using snake_case for DB)
-      const dbProfile = {
-        id: authData.user.id,
+      if (!authData.session) {
+        setEmailSent(true);
+        setStep(1); 
+        setIsLoginMode(true);
+        setAuthLoading(false);
+        playSound('message');
+        return; 
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // 2. Prepare Profile Data (snake_case for DB)
+      const updates = {
         full_name: name || 'Traveler',
         email: email,
         current_level: level,
@@ -150,16 +181,26 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         streak_count: 1,
         completed_modules: [],
         unlocked_modules: starterPack,
-        owned_levels: []
+        owned_levels: [],
+        last_active_at: new Date().toISOString()
       };
 
-      const { error: profileError } = await supabase
+      const { error: updateError, data: updateData } = await supabase
         .from('profiles')
-        .insert(dbProfile);
+        .update(updates)
+        .eq('id', authData.user.id)
+        .select();
 
-      if (profileError) throw profileError;
+      if (!updateData || updateData.length === 0) {
+        console.log("Profile not found via trigger, attempting manual insert...");
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({ id: authData.user.id, ...updates });
 
-      // 3. Complete (Using camelCase for App State)
+        if (insertError) console.error("Profile creation failed:", insertError);
+      }
+
+      playSound('stamp', 0.8);
       onComplete({
         name: name || 'Traveler',
         level: level,
@@ -173,6 +214,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       });
 
     } catch (e: any) {
+      playSound('error');
       setAuthError(e.message);
     } finally {
       setAuthLoading(false);
@@ -183,6 +225,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const isCorrect = idx === PLACEMENT_TEST[quizIndex].correct;
     const nextScore = isCorrect ? score + 1 : score;
     setScore(nextScore);
+    
+    if (isCorrect) playSound('click', 0.6);
+    else playSound('click', 0.3);
 
     if (quizIndex < PLACEMENT_TEST.length - 1) {
       setQuizIndex(quizIndex + 1);
@@ -201,6 +246,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     if (finalScore === 12) assignedLevel = GermanLevel.C1; 
 
     setLevel(assignedLevel);
+    playSound('success', 0.6);
     setQuizFinished(true);
   };
 
@@ -208,18 +254,19 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     setLevel(GermanLevel.A1);
     setQuizFinished(true);
     setQuizStarted(true);
+    playSound('paper', 0.5);
   };
 
   return (
     <div className="min-h-screen bg-[#f5f5f4] flex items-center justify-center p-4 relative overflow-hidden paper-texture">
-      {/* Decorative Elements */}
-      <div className="absolute top-0 right-0 p-20 opacity-10 pointer-events-none">
+      {/* Decorative Elements - Animated */}
+      <div className="absolute top-0 right-0 p-20 opacity-10 pointer-events-none animate-float">
          <Globe size={400} className="text-stone-400" />
       </div>
 
       <div className="relative z-10 w-full max-w-lg bg-white border border-stone-200 p-8 shadow-xl rounded-sm">
         <div className="mb-8 text-center">
-          <div className="w-16 h-16 bg-[#059669] rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-lg">
+          <div className="w-16 h-16 bg-[#059669] rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-lg animate-pulse-subtle">
              <Plane size={32} />
           </div>
           <h1 className="text-3xl font-display text-stone-800 mb-2">Passport Setup</h1>
@@ -228,25 +275,33 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
         {/* STEP 1: CREDENTIALS */}
         {step === 1 && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-6 animate-slide-up">
              <div className="flex bg-stone-100 p-1 rounded-lg mb-6">
                 <button 
-                  onClick={() => { setIsLoginMode(false); setAuthError(null); }}
+                  onClick={() => { setIsLoginMode(false); setAuthError(null); setEmailSent(false); playSound('click'); }}
                   className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${!isLoginMode ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
                 >
                   New Traveler
                 </button>
                 <button 
-                  onClick={() => { setIsLoginMode(true); setAuthError(null); }}
+                  onClick={() => { setIsLoginMode(true); setAuthError(null); setEmailSent(false); playSound('click'); }}
                   className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${isLoginMode ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
                 >
                   Existing Passport
                 </button>
              </div>
+             
+             {emailSent && (
+               <div className="bg-green-50 text-green-700 p-4 rounded-lg border border-green-200 flex flex-col items-center text-center animate-fade-in">
+                  <Mail size={24} className="mb-2 text-[#059669]" />
+                  <p className="font-bold mb-1">Confirmation Email Sent</p>
+                  <p className="text-xs">Please verify your inbox to activate your passport. You can log in once verified.</p>
+               </div>
+             )}
 
              {authError && (
-               <div className="bg-red-50 text-red-600 p-3 text-sm rounded flex items-center gap-2">
-                 <Lock size={14}/> {authError}
+               <div className="bg-red-50 text-red-600 p-3 text-sm rounded flex items-center gap-2 border border-red-100">
+                 <Lock size={14} className="shrink-0"/> {authError}
                </div>
              )}
 
@@ -291,19 +346,30 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                </div>
              </div>
 
-             <Button 
-               onClick={handleAuth} 
-               disabled={!email || !password || (!isLoginMode && !name) || authLoading} 
-               className="w-full"
-             >
-                {authLoading ? 'Verifying...' : (isLoginMode ? 'Unlock Passport' : 'Create Identity')}
-             </Button>
+             <div className="space-y-4">
+               <Button 
+                 onClick={handleAuth} 
+                 disabled={!email || !password || (!isLoginMode && !name) || authLoading} 
+                 className="w-full"
+               >
+                  {authLoading ? 'Verifying...' : (isLoginMode ? 'Unlock Passport' : 'Create Identity')}
+               </Button>
+               
+               {onGuestLogin && (
+                 <button 
+                   onClick={onGuestLogin}
+                   className="w-full py-2 text-stone-400 text-sm font-bold hover:text-stone-600 flex items-center justify-center gap-2 transition-colors"
+                 >
+                   <UserCircle2 size={16} /> Continue as Guest (Offline Mode)
+                 </button>
+               )}
+             </div>
           </div>
         )}
 
         {/* STEP 2: PROFICIENCY */}
         {step === 2 && (
-          <div className="animate-fade-in">
+          <div className="animate-slide-up">
             {!quizStarted && !quizFinished && (
               <div className="text-center space-y-6">
                 <h2 className="text-xl text-stone-800 font-display">Proficiency Check</h2>
@@ -311,7 +377,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                   Welcome, {name}. Before we print your visa, let's check your German level.
                 </p>
                 <div className="space-y-3">
-                  <Button onClick={() => setQuizStarted(true)} className="w-full">
+                  <Button onClick={() => { setQuizStarted(true); playSound('click'); }} className="w-full">
                     Take Quick Assessment
                   </Button>
                   <Button variant="ghost" onClick={skipToBeginner} className="w-full">
@@ -347,19 +413,19 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             )}
 
             {quizFinished && (
-              <div className="text-center space-y-6 animate-fade-in">
-                <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto text-amber-600 mb-4">
+              <div className="text-center space-y-6 animate-slide-up">
+                <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto text-amber-600 mb-4 animate-bounce">
                    <GraduationCap size={40} />
                 </div>
                 <div>
                   <h2 className="text-2xl font-display text-stone-800 mb-2">Assessment Complete</h2>
                   <p className="text-stone-500">Your recommended starting level is:</p>
-                  <div className="text-4xl font-display font-bold text-[#059669] mt-4 mb-2">{level}</div>
+                  <div className="text-4xl font-display font-bold text-[#059669] mt-4 mb-2 animate-pulse-subtle">{level}</div>
                   <p className="text-xs text-stone-400 uppercase tracking-widest">
                     {level === GermanLevel.A1 ? "Beginner" : level === GermanLevel.B2 || level === GermanLevel.C1 ? "Advanced" : "Intermediate"}
                   </p>
                 </div>
-                <Button onClick={() => setStep(3)} className="w-full">
+                <Button onClick={() => { setStep(3); playSound('paper'); }} className="w-full">
                   Confirm & Continue
                 </Button>
               </div>
@@ -369,7 +435,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
         {/* STEP 3: INTERESTS & FINISH */}
         {step === 3 && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-6 animate-slide-up">
              <h2 className="text-xl text-stone-800 font-display flex items-center gap-2">
                <Map className="w-5 h-5 text-[#059669]" /> Travel Interests
              </h2>

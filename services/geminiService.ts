@@ -1,7 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CurriculumModule, UserProfile, GermanLevel, SuggestedResponse, MissionBriefing, ChatMessage, PerformanceReview, PracticeDrill } from "../types";
 
-const apiKey = process.env.API_KEY || ''; 
+// Use Vite environment variable or fallback to the provided key
+const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 'AIzaSyAsfWTh2Nkg9VTmMirhqoR2CmH_eyITcgM';
 
 const ai = new GoogleGenAI({ apiKey });
 
@@ -89,7 +90,7 @@ export const generateMissionBriefing = async (
        - title: The specific Grammar Rule name.
        - explanation: A clear, academic but easy explanation (max 3 sentences).
        - example: A sentence demonstrating the rule.
-       - grammarTable: A structured table to visualize the rule (e.g., Conjugation table: Headers ["Person", "Ending"], Rows [["Ich", "-e"], ["Du", "-st"]...]). If not a table, list key structure points.
+       - grammarTable: A structured table to visualize the rule. Must include 'headers' (list of strings) and 'rows' (list of lists of strings).
        - commonMistakes: 2-3 common errors learners make with this specific rule.
     3. keyPhrases: 4 useful sentences for the scenario.
     4. culturalFact: A fascinating tidbit about Germany related to the scenario.
@@ -151,16 +152,68 @@ export const generateMissionBriefing = async (
         responseSchema: schema
       }
     });
-    return JSON.parse(response.text || "{}");
+    
+    // Parse
+    const data = JSON.parse(response.text || "{}");
+    
+    // PARTIAL RECOVERY STRATEGY
+    // Even if Gemini returns incomplete data (e.g. only vocabulary), we use what we have
+    // and fill the rest with safe defaults to prevent app crashes.
+
+    const safeBriefing: MissionBriefing = {
+        vocabulary: Array.isArray(data.vocabulary) ? data.vocabulary : [],
+        lesson: {
+            title: data.lesson?.title || module.title,
+            explanation: data.lesson?.explanation || `Focus on ${module.grammarFocus[0]} and prepare for your mission.`,
+            example: data.lesson?.example || "",
+            grammarTable: data.lesson?.grammarTable || { headers: [], rows: [] },
+            commonMistakes: Array.isArray(data.lesson?.commonMistakes) ? data.lesson.commonMistakes : []
+        },
+        keyPhrases: Array.isArray(data.keyPhrases) ? data.keyPhrases : [],
+        culturalFact: data.culturalFact || "German is spoken by over 100 million people worldwide.",
+        quiz: data.quiz || {
+            question: "Ready to start the mission?",
+            options: ["Ja! (Yes)", "Nein (No)"],
+            correctAnswer: 0
+        }
+    };
+
+    // Sanity check for Grammar Table structure
+    if (safeBriefing.lesson.grammarTable) {
+        if (!Array.isArray(safeBriefing.lesson.grammarTable.headers) || !Array.isArray(safeBriefing.lesson.grammarTable.rows)) {
+            safeBriefing.lesson.grammarTable = { headers: [], rows: [] };
+        }
+    }
+
+    // Only fail if we have ZERO useful content
+    if (safeBriefing.vocabulary.length === 0 && safeBriefing.keyPhrases.length === 0 && !data.lesson) {
+        console.warn("Gemini response empty:", data);
+        throw new Error("Briefing data completely empty");
+    }
+    
+    return safeBriefing;
   } catch (e) {
-    console.error(e);
-    // Fallback data
+    console.warn("Gemini Error or Validation Failure (using fallback):", e);
+    // Hard Fallback data if API fails completely
     return {
-      vocabulary: [{ german: 'Hallo', english: 'Hello' }],
-      lesson: { title: 'Basics', explanation: 'Verbs go in position 2.', example: 'Ich komme aus Berlin.', commonMistakes: ['Putting verb at end'] },
-      keyPhrases: [{ german: 'Ich möchte...', english: 'I would like...' }],
-      culturalFact: 'Germany has over 20,000 castles.',
-      quiz: { question: 'Where does the verb go?', options: ['Position 1', 'Position 2', 'End'], correctAnswer: 1 }
+      vocabulary: [{ german: 'Hallo', english: 'Hello' }, { german: 'Danke', english: 'Thank you' }],
+      lesson: { 
+        title: 'Mission Basics', 
+        explanation: 'Review your vocabulary and prepare for the conversation.', 
+        example: 'Guten Tag, wie geht es Ihnen?', 
+        commonMistakes: ['Forgetting to capitalize nouns', 'Mixing up Du and Sie'],
+        grammarTable: {
+          headers: ["Person", "Verb Ending"],
+          rows: [["ich", "-e"], ["du", "-st"], ["er/sie/es", "-t"]]
+        }
+      },
+      keyPhrases: [{ german: 'Ich möchte...', english: 'I would like...' }, { german: 'Können Sie mir helfen?', english: 'Can you help me?'}],
+      culturalFact: 'Germany has over 20,000 castles and a rich history of folklore.',
+      quiz: { 
+        question: 'Which pronoun is used for formal address?', 
+        options: ['du', 'ihr', 'Sie', 'er'], 
+        correctAnswer: 2 
+      }
     };
   }
 };
@@ -201,6 +254,8 @@ export const generateMissionStart = async (
 
     const data = JSON.parse(response.text || "{}");
     
+    if (!data.agentMessage) throw new Error("Incomplete mission data");
+
     return {
       ...data,
       objectivesUpdate: [false, false, false], 
@@ -354,7 +409,10 @@ export const generateGrammarLesson = async (level: string, topic: string): Promi
         responseSchema: schema
       }
     });
-    return JSON.parse(response.text || "{}");
+    
+    const data = JSON.parse(response.text || "{}");
+    if (!data.title || !data.explanation) throw new Error("Incomplete grammar lesson");
+    return data;
   } catch (e) {
     console.error(e);
     return {

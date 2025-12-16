@@ -85,13 +85,31 @@ const App: React.FC = () => {
     setAppState(AppState.DASHBOARD);
   };
 
+  const handleGuestLogin = () => {
+    // Create a temporary guest profile
+    const guestUser: UserProfile = {
+      name: 'Guest Traveler',
+      level: GermanLevel.A1,
+      interests: ['Culture', 'Food'],
+      credits: 500,
+      xp: 0,
+      streak: 1,
+      completedModules: [],
+      unlockedModules: ['A1.1', 'A1.2', 'A1.3', 'A1.4', 'A1.5', 'A1.6'],
+      ownedLevels: []
+    };
+    setUser(guestUser);
+    setUserId(null); // Explicitly null to indicate no DB sync
+    setAppState(AppState.DASHBOARD);
+  };
+
   const handleSelectModule = (module: CurriculumModule) => {
     setActiveModule(module);
     setAppState(AppState.GAME_SESSION);
   };
 
   const handleExitSession = (xpEarned: number, completed: boolean) => {
-    if (user && activeModule && userId) {
+    if (user && activeModule) {
       const newCompletedModules = completed 
           ? Array.from(new Set([...user.completedModules, activeModule.id]))
           : user.completedModules;
@@ -109,19 +127,21 @@ const App: React.FC = () => {
       // 1. Optimistic Update
       setUser(updatedUser);
       
-      // 2. DB Update
-      updateUserProfile(userId, {
-        xp: newXp,
-        credits: newCredits,
-        completedModules: newCompletedModules
-      });
+      // 2. DB Update (Only if logged in)
+      if (userId) {
+        updateUserProfile(userId, {
+          xp: newXp,
+          credits: newCredits,
+          completedModules: newCompletedModules
+        });
+      }
     }
     setActiveModule(null);
     setAppState(AppState.DASHBOARD);
   };
 
   const handlePurchaseLevel = (level: GermanLevel, tokensRedeemed: number) => {
-    if (user && userId) {
+    if (user) {
       const newCredits = Math.max(0, user.credits - tokensRedeemed);
       const newOwned = [...user.ownedLevels, level];
 
@@ -134,12 +154,12 @@ const App: React.FC = () => {
       // Optimistic
       setUser(updatedUser);
       
-      // DB Updates
-      updateUserProfile(userId, { credits: newCredits, ownedLevels: newOwned });
-      
-      // Record revenue (Mocking INR price logic here for record keeping)
-      const price = level === GermanLevel.A1 ? 1499 : 2999;
-      recordPurchase(userId, `LEVEL_${level}`, price - tokensRedeemed);
+      // DB Updates (Only if logged in)
+      if (userId) {
+        updateUserProfile(userId, { credits: newCredits, ownedLevels: newOwned });
+        const price = level === GermanLevel.A1 ? 1499 : 2999;
+        recordPurchase(userId, `LEVEL_${level}`, price - tokensRedeemed);
+      }
       
       setPreSelectedLevel(null);
     }
@@ -151,7 +171,7 @@ const App: React.FC = () => {
   };
 
   const handleUnlockModule = (moduleId: string, cost: number) => {
-    if (user && user.credits >= cost && userId) {
+    if (user && user.credits >= cost) {
       const newCredits = user.credits - cost;
       const newUnlocked = [...user.unlockedModules, moduleId];
 
@@ -162,7 +182,10 @@ const App: React.FC = () => {
       };
       
       setUser(updatedUser);
-      updateUserProfile(userId, { credits: newCredits, unlockedModules: newUnlocked });
+      
+      if (userId) {
+        updateUserProfile(userId, { credits: newCredits, unlockedModules: newUnlocked });
+      }
     }
   };
 
@@ -173,7 +196,7 @@ const App: React.FC = () => {
       return;
     }
 
-    if (!user || !userId) return;
+    if (!user) return;
     
     let updatedUser = { ...user };
     
@@ -198,7 +221,9 @@ const App: React.FC = () => {
     }
     
     setUser(updatedUser);
-    await updateUserProfile(userId, updatedUser);
+    if (userId) {
+      await updateUserProfile(userId, updatedUser);
+    }
   };
 
   if (isLoading) {
@@ -210,9 +235,12 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="font-sans text-white">
+    <div className="font-sans text-stone-900">
       {appState === AppState.ONBOARDING && (
-        <Onboarding onComplete={handleOnboardingComplete} />
+        <Onboarding 
+          onComplete={handleOnboardingComplete} 
+          onGuestLogin={handleGuestLogin}
+        />
       )}
 
       {appState === AppState.DASHBOARD && user && (

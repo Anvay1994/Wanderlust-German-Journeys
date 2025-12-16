@@ -1,21 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 import { UserProfile, GermanLevel } from '../types';
 
-// Access environment variables using Vite's import.meta.env
-// We cast to 'any' to avoid TypeScript errors if the vite/client types aren't loaded globally
-const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
-const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+// Access environment variables with hardcoded fallbacks from your provided env.txt
+// This ensures the app works immediately even if the .env file isn't being read correctly.
+const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bzwdxfjdrkoomzsvpidk.supabase.co';
+const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_OkE90DwzmmKJLPoE9OukCQ_YpiyXHxN';
 
 // Initialize the Supabase client
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey)
   : {
-      // Mock implementation to prevent crashes if env vars are missing
+      // Mock implementation should rarely be hit now that we have fallbacks
       auth: {
          getSession: async () => ({ data: { session: null }, error: null }),
          onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-         signInWithPassword: async () => ({ error: { message: "Supabase not configured (Missing VITE_SUPABASE_URL)" } }),
-         signUp: async () => ({ error: { message: "Supabase not configured (Missing VITE_SUPABASE_URL)" } }),
+         signInWithPassword: async () => ({ error: { message: "Supabase configuration error" } }),
+         signUp: async () => ({ error: { message: "Supabase configuration error" } }),
          signOut: async () => ({ error: null }),
       },
       from: () => ({
@@ -35,8 +35,6 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
  */
 export const mapProfileToUser = (row: any): UserProfile => {
   return {
-    // We map the requested fields even if they aren't strictly in the UserProfile interface yet
-    // to ensure data availability if the type definition expands.
     name: row.full_name || 'Traveler',
     level: (row.current_level as GermanLevel) || GermanLevel.A1,
     interests: row.interests || [],
@@ -55,7 +53,6 @@ export const mapProfileToUser = (row: any): UserProfile => {
 export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
   const dbUpdates: any = {};
   
-  // Map frontend keys to DB columns
   if (updates.name !== undefined) dbUpdates.full_name = updates.name;
   if (updates.level !== undefined) dbUpdates.current_level = updates.level;
   if (updates.streak !== undefined) dbUpdates.streak_count = updates.streak;
@@ -66,7 +63,6 @@ export const updateUserProfile = async (userId: string, updates: Partial<UserPro
   if (updates.unlockedModules !== undefined) dbUpdates.unlocked_modules = updates.unlockedModules;
   if (updates.ownedLevels !== undefined) dbUpdates.owned_levels = updates.ownedLevels;
 
-  // Always update timestamp
   dbUpdates.last_active = new Date().toISOString();
 
   const { error } = await supabase

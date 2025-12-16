@@ -92,7 +92,7 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                    </div>
 
                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-                      {briefing.vocabulary.map((item, idx) => (
+                      {briefing.vocabulary?.map((item, idx) => (
                         <button 
                            key={idx} 
                            className="bg-white p-4 rounded-lg border-2 border-stone-200 hover:border-[#059669] hover:shadow-lg transition-all text-left group relative"
@@ -121,7 +121,7 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
               )}
 
               {/* STEP 2: BRIEFING (Lesson) */}
-              {step === 'briefing' && (
+              {step === 'briefing' && briefing.lesson && (
                 <div className="animate-fade-in">
                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                       
@@ -131,20 +131,20 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                          {/* Concept Card */}
                          <div className="bg-white shadow-md rounded-lg border border-stone-200 overflow-hidden">
                              <div className="bg-stone-800 text-white p-4 flex items-center justify-between">
-                                <h3 className="font-bold flex items-center gap-2"><Lightbulb size={18} /> Protocol: {briefing.lesson.title}</h3>
+                                <h3 className="font-bold flex items-center gap-2"><Lightbulb size={18} /> Protocol: {briefing.lesson?.title}</h3>
                              </div>
                              <div className="p-6">
-                                <p className="text-lg text-stone-700 leading-relaxed mb-6">{briefing.lesson.explanation}</p>
+                                <p className="text-lg text-stone-700 leading-relaxed mb-6">{briefing.lesson?.explanation}</p>
                                 
                                 <div className="bg-emerald-50 border-l-4 border-[#059669] p-4 mb-6">
                                    <span className="text-xs font-bold text-emerald-800 uppercase tracking-widest mb-1 block">Primary Example</span>
                                    <div className="flex items-center justify-between">
-                                      <span className="text-xl font-bold text-stone-800">{briefing.lesson.example}</span>
-                                      <button onClick={() => playAudio(briefing.lesson.example)} className="text-[#059669] hover:text-emerald-700"><Volume2 size={24}/></button>
+                                      <span className="text-xl font-bold text-stone-800">{briefing.lesson?.example}</span>
+                                      <button onClick={() => playAudio(briefing.lesson?.example || '')} className="text-[#059669] hover:text-emerald-700"><Volume2 size={24}/></button>
                                    </div>
                                 </div>
 
-                                {briefing.lesson.grammarTable && (
+                                {briefing.lesson?.grammarTable && briefing.lesson.grammarTable.headers && briefing.lesson.grammarTable.rows && (
                                    <div className="bg-stone-50 rounded-lg border border-stone-200 overflow-hidden">
                                       <table className="w-full text-left text-sm">
                                          <thead>
@@ -157,7 +157,7 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                                          <tbody>
                                             {briefing.lesson.grammarTable.rows.map((row, rIdx) => (
                                               <tr key={rIdx} className="border-b border-stone-100 last:border-0 hover:bg-white">
-                                                {row.map((cell, cIdx) => (
+                                                {Array.isArray(row) && row.map((cell, cIdx) => (
                                                   <td key={cIdx} className="p-3 text-stone-800 font-medium">{cell}</td>
                                                 ))}
                                               </tr>
@@ -170,7 +170,7 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                          </div>
                          
                          {/* Common Mistakes */}
-                         {briefing.lesson.commonMistakes && briefing.lesson.commonMistakes.length > 0 && (
+                         {briefing.lesson?.commonMistakes && briefing.lesson.commonMistakes.length > 0 && (
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                                <h4 className="flex items-center gap-2 text-amber-800 font-bold mb-3">
                                   <AlertTriangle size={18} /> Caution: Common Errors
@@ -194,7 +194,7 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                                <MessageCircle size={18} /> Tactical Phrases
                             </h4>
                             <div className="space-y-3">
-                              {briefing.keyPhrases.map((phrase, i) => (
+                              {briefing.keyPhrases?.map((phrase, i) => (
                                  <div key={i} className="p-3 bg-stone-50 rounded border border-stone-100 hover:bg-stone-100 transition-colors cursor-pointer" onClick={() => playAudio(phrase.german)}>
                                     <div className="font-bold text-stone-700">{phrase.german}</div>
                                     <div className="text-stone-400 italic text-xs mt-1">{phrase.english}</div>
@@ -223,7 +223,7 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
               )}
 
               {/* STEP 3: CLEARANCE (Quiz) */}
-              {step === 'clearance' && (
+              {step === 'clearance' && briefing.quiz && (
                 <div className="animate-fade-in w-full max-w-2xl mx-auto">
                    <div className="text-center mb-8">
                       <div className="w-16 h-16 bg-stone-200 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-500">
@@ -234,9 +234,9 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                    </div>
 
                    <div className="bg-white p-8 rounded-lg shadow-lg border-2 border-stone-200 mb-6 relative">
-                      <h4 className="text-xl font-bold text-stone-800 mb-6">{briefing.quiz.question}</h4>
+                      <h4 className="text-xl font-bold text-stone-800 mb-6">{briefing.quiz?.question}</h4>
                       <div className="space-y-3">
-                        {briefing.quiz.options.map((opt, i) => (
+                        {briefing.quiz?.options.map((opt, i) => (
                            <button
                              key={i}
                              onClick={() => !quizCorrect && handleQuizSubmit(i)}

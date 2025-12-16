@@ -4,6 +4,7 @@ import { generateMissionStart, processTurn, MissionResponse } from '../services/
 import MissionPrep from './MissionPrep';
 import Button from './Button';
 import { Mic, Send, Info, CheckCircle2, ArrowLeft, Loader2, Volume2, Map, Puzzle, RefreshCcw, Star, Award, TrendingUp, AlertTriangle } from 'lucide-react';
+import { useSoundEffects } from '../hooks/useSoundEffects';
 
 interface GameSessionProps {
   user: UserProfile;
@@ -12,6 +13,8 @@ interface GameSessionProps {
 }
 
 const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
+  const { playSound } = useSoundEffects();
+  
   // Session State
   const [sessionState, setSessionState] = useState<'prep' | 'chat'>('prep');
   
@@ -47,6 +50,7 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
           const initialObjectives = data.objectives || ["Complete the dialogue"];
           setObjectives(initialObjectives);
           setObjectivesStatus(new Array(initialObjectives.length).fill(false));
+          playSound('paper', 0.6); // Scene Start Sound
         } catch (err) {
           console.error(err);
           setMessages([{ id: 'err', role: 'system', content: 'Connection to local guide failed. Please retry.' }]);
@@ -65,10 +69,18 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
 
   useEffect(() => {
     if (toastMessage) {
+      playSound('success', 0.4);
       const timer = setTimeout(() => setToastMessage(null), 3000);
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
+
+  // Effect for mission completion
+  useEffect(() => {
+    if (missionStatus === 'completed') {
+      playSound('stamp', 0.8);
+    }
+  }, [missionStatus]);
 
   const shuffleArray = (array: any[]) => {
     return array.map(value => ({ value, sort: Math.random() }))
@@ -122,12 +134,18 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
       translation: data.englishTranslation,
       grammarCorrection: data.correction
     };
-    setMessages(prev => [...prev, newMessage]);
+    
+    // Slight delay for "thinking" feel + sound
+    setTimeout(() => {
+       setMessages(prev => [...prev, newMessage]);
+       playSound('message', 0.3);
+    }, isInitial ? 0 : 600);
   };
 
   const handleSend = async (text: string = input) => {
     if (!text.trim()) return;
     
+    playSound('click', 0.5);
     setTargetSentence(null); // Clear exercise
     setJumbledWords([]);
     
@@ -141,12 +159,14 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
       handleAiResponse(response);
     } catch (err) {
       console.error(err);
+      playSound('error');
     } finally {
       setLoading(false);
     }
   };
 
   const addWordToInput = (word: string) => {
+    playSound('click', 0.3);
     setInput(prev => {
       const prefix = prev.trim().length > 0 ? prev.trim() + ' ' : '';
       return prefix + word;
@@ -184,13 +204,13 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
   if (missionStatus === 'completed') {
     return (
       <div className="min-h-screen bg-[#f5f5f4] flex items-center justify-center p-4 md:p-8 paper-texture overflow-y-auto">
-        <div className="bg-white max-w-2xl w-full shadow-2xl border border-stone-200 rounded-lg overflow-hidden animate-fade-in relative">
+        <div className="bg-white max-w-2xl w-full shadow-2xl border border-stone-200 rounded-lg overflow-hidden animate-fade-in relative transform transition-all">
           
           {/* Header */}
           <div className="bg-[#059669] text-white p-8 text-center relative overflow-hidden">
-             <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+             <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] animate-pulse-subtle"></div>
              <div className="relative z-10">
-               <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg text-[#059669]">
+               <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg text-[#059669] animate-bounce">
                   <Award size={40} />
                </div>
                <h2 className="text-3xl font-display font-bold mb-2">Mission Accomplished</h2>
@@ -198,10 +218,17 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
              </div>
           </div>
 
-          <div className="p-8">
+          <div className="p-8 relative">
+             {/* STAMP ANIMATION */}
+             <div className="absolute top-4 right-8 opacity-0 animate-stamp z-20 pointer-events-none">
+                <div className="border-4 border-red-800/80 rounded-full p-2 w-32 h-32 flex items-center justify-center transform rotate-12 text-red-900 font-bold font-display text-xl uppercase tracking-widest shadow-sm bg-red-100/10 backdrop-blur-[1px]">
+                   APPROVED
+                </div>
+             </div>
+
              {/* XP Reward */}
              <div className="flex justify-center mb-8">
-               <div className="bg-emerald-50 border border-emerald-100 px-6 py-3 rounded-full flex items-center gap-3">
+               <div className="bg-emerald-50 border border-emerald-100 px-6 py-3 rounded-full flex items-center gap-3 animate-slide-up">
                  <span className="text-stone-500 uppercase text-xs font-bold tracking-widest">Total Reward</span>
                  <span className="text-2xl font-display font-bold text-[#059669]">+{xpSession} Miles</span>
                </div>
@@ -210,13 +237,13 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
              {/* Performance Review */}
              {performanceReview && (
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <div className="bg-stone-50 p-5 rounded-lg border border-stone-100">
+                  <div className="bg-stone-50 p-5 rounded-lg border border-stone-100 animate-slide-up" style={{animationDelay: '0.2s'}}>
                      <h4 className="flex items-center gap-2 text-[#059669] font-bold mb-3 uppercase text-xs tracking-widest">
                        <CheckCircle2 size={16} /> Strengths
                      </h4>
                      <p className="text-sm text-stone-700 leading-relaxed">{performanceReview.strengths}</p>
                   </div>
-                  <div className="bg-amber-50 p-5 rounded-lg border border-amber-100">
+                  <div className="bg-amber-50 p-5 rounded-lg border border-amber-100 animate-slide-up" style={{animationDelay: '0.3s'}}>
                      <h4 className="flex items-center gap-2 text-amber-600 font-bold mb-3 uppercase text-xs tracking-widest">
                        <AlertTriangle size={16} /> Field Notes
                      </h4>
@@ -226,7 +253,7 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
              )}
              
              {performanceReview && (
-               <div className="mb-8 text-center italic text-stone-500 font-serif border-l-4 border-[#059669] pl-4 py-2 bg-stone-50">
+               <div className="mb-8 text-center italic text-stone-500 font-serif border-l-4 border-[#059669] pl-4 py-2 bg-stone-50 animate-ink">
                  "{performanceReview.feedback}"
                </div>
              )}
@@ -274,18 +301,18 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
       <div className="flex flex-1 overflow-hidden">
         {/* Main Chat Area */}
         <main className="flex-1 flex flex-col relative bg-[#fafaf9]">
-          <div className="bg-[#fffbeb] p-4 border-b border-amber-100 text-sm text-amber-900 font-serif italic text-center shadow-sm">
+          <div className="bg-[#fffbeb] p-4 border-b border-amber-100 text-sm text-amber-900 font-serif italic text-center shadow-sm animate-ink">
             {narrative || "Arriving at destination..."}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
             {messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}>
                 <div className={`max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col`}>
-                  <div className={`p-5 rounded-2xl relative shadow-sm ${
+                  <div className={`p-5 rounded-2xl relative shadow-sm transition-all duration-300 ${
                     msg.role === 'user' 
-                      ? 'bg-[#059669] text-white rounded-br-sm' 
-                      : 'bg-white border border-stone-200 text-stone-800 rounded-bl-sm'
+                      ? 'bg-[#059669] text-white rounded-br-sm shadow-md' 
+                      : 'bg-white border border-stone-200 text-stone-800 rounded-bl-sm shadow-sm'
                   }`}>
                     <div className="flex justify-between items-start gap-3">
                       <p className="text-lg leading-relaxed">{msg.content}</p>
@@ -312,7 +339,7 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
             ))}
             
             {loading && (
-              <div className="flex justify-start">
+              <div className="flex justify-start animate-pulse">
                 <div className="bg-white border border-stone-200 p-4 rounded-full text-stone-500 text-sm flex gap-2 items-center shadow-sm">
                   <Loader2 className="animate-spin w-4 h-4 text-[#059669]" /> Translating...
                 </div>
@@ -322,11 +349,11 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
           </div>
 
           {/* Input Area */}
-          <div className="bg-white p-4 border-t border-stone-200">
+          <div className="bg-white p-4 border-t border-stone-200 relative z-20">
             
             {/* Sentence Builder / Jumbled Words */}
             {!loading && targetSentence && jumbledWords.length > 0 && (
-              <div className="mb-4 bg-stone-50 p-3 rounded-lg border border-stone-200">
+              <div className="mb-4 bg-stone-50 p-3 rounded-lg border border-stone-200 animate-slide-up">
                  <div className="flex items-center justify-between text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">
                    <div className="flex items-center gap-1"><Puzzle size={14} /> Sentence Builder</div>
                    <button onClick={() => setTargetSentence(null)} className="hover:text-red-500">Skip</button>
@@ -393,7 +420,7 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
             ))}
           </div>
           {culturalNote && (
-            <div className="bg-[#fffbeb] border border-amber-200 p-4 rounded-lg mb-6 shadow-sm">
+            <div className="bg-[#fffbeb] border border-amber-200 p-4 rounded-lg mb-6 shadow-sm animate-float">
                <h4 className="text-amber-800 font-bold text-xs uppercase tracking-widest mb-2 flex items-center gap-1">
                  <Info size={12} /> Cultural Insight
                </h4>
