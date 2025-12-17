@@ -6,6 +6,8 @@ import Dashboard from './components/Dashboard';
 import GameSession from './components/GameSession';
 import StoreModal from './components/StoreModal';
 import Guidebook from './components/Guidebook';
+import Analytics from './components/Analytics';
+import LearningStrategy from './components/LearningStrategy';
 import AdminConsole from './components/AdminConsole';
 import { Loader2 } from 'lucide-react';
 import { supabase, mapProfileToUser, updateUserProfile, recordPurchase } from './services/supabaseClient';
@@ -120,7 +122,7 @@ const App: React.FC = () => {
       const updatedUser = { 
         ...user, 
         xp: newXp,
-        credits: newCredits,
+        credits: newCredits, 
         completedModules: newCompletedModules
       };
       
@@ -251,6 +253,8 @@ const App: React.FC = () => {
             onOpenStore={() => setShowStore(true)}
             onOpenLevelPurchase={handleOpenStoreForLevel}
             onOpenGuidebook={() => setAppState(AppState.GUIDEBOOK)}
+            onOpenAnalytics={() => setAppState(AppState.ANALYTICS)}
+            onOpenStrategy={() => setAppState(AppState.LEARNING_STRATEGY)}
             onUnlockModule={handleUnlockModule}
             onDevAction={handleDevAction}
           />
@@ -277,6 +281,19 @@ const App: React.FC = () => {
         <Guidebook 
           onBack={() => setAppState(AppState.DASHBOARD)} 
           level={user.level}
+        />
+      )}
+
+      {appState === AppState.ANALYTICS && user && (
+        <Analytics 
+          user={user}
+          onBack={() => setAppState(AppState.DASHBOARD)}
+        />
+      )}
+
+      {appState === AppState.LEARNING_STRATEGY && (
+        <LearningStrategy 
+          onBack={() => setAppState(AppState.DASHBOARD)} 
         />
       )}
       

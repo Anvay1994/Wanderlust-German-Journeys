@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CurriculumModule, MissionBriefing } from '../types';
 import { generateMissionBriefing } from '../services/geminiService';
 import Button from './Button';
-import { Loader2, Book, Lightbulb, MessageCircle, ArrowRight, Lock, CheckCircle, Volume2, ShieldCheck, FileText, AlertTriangle, PenTool, Target, CheckSquare } from 'lucide-react';
+import { Loader2, Book, Lightbulb, MessageCircle, ArrowRight, Lock, CheckCircle, Volume2, ShieldCheck, FileText, AlertTriangle, PenTool, Target, CheckSquare, Sparkles } from 'lucide-react';
 
 interface MissionPrepProps {
   module: CurriculumModule;
@@ -51,6 +51,7 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
       <div className="flex flex-col items-center justify-center h-full space-y-4">
         <Loader2 className="w-8 h-8 animate-spin text-[#059669]" />
         <p className="text-stone-500 font-display">Assembling Mission Dossier...</p>
+        <p className="text-xs text-stone-400">Analyzing CEFR level requirements...</p>
       </div>
     );
   }
@@ -119,6 +120,18 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                         </button>
                       ))}
                    </div>
+                   
+                   {briefing.strategyTip && (
+                      <div className="mb-8 bg-[#f0fdf4] border border-green-200 p-4 rounded-lg flex items-start gap-3">
+                         <div className="bg-white p-2 rounded-full text-green-600 shadow-sm shrink-0">
+                            <Sparkles size={18} />
+                         </div>
+                         <div>
+                            <h4 className="font-bold text-green-800 text-sm uppercase tracking-widest mb-1">Travel Hack</h4>
+                            <p className="text-green-900 text-sm leading-relaxed">{briefing.strategyTip}</p>
+                         </div>
+                      </div>
+                   )}
 
                    <div className="flex gap-4 mt-auto pt-4 border-t border-stone-200">
                      <Button variant="ghost" onClick={onCancel} className="flex-1">Abort Mission</Button>

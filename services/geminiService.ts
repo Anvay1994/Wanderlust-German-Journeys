@@ -75,28 +75,29 @@ const RESPONSE_SCHEMA = {
 export const generateMissionBriefing = async (
   module: CurriculumModule
 ): Promise<MissionBriefing> => {
-  const model = "gemini-2.5-flash";
+  const model = "gemini-2.5-flash"; // Supports Thinking Config
   const prompt = `
-    Create a COMPREHENSIVE educational dossier for a German learner before a mission.
-    It must act as a detailed mini-lesson for the specific grammar concept.
-
+    Create a COMPREHENSIVE educational dossier for a German learner.
+    This is the "Mission Prep" phase. It MUST be detailed and complete.
+    
     Module: ${module.title} (${module.level})
     Grammar Focus: ${module.grammarFocus.join(', ')}
     Vocab Theme: ${module.vocabularyTheme}
 
     Output JSON with:
-    1. missionGoal: A 1-sentence strategic objective for the learner in this specific scenario (e.g. "Master the verb 'sein' to confidently introduce yourself at the border.").
-    2. vocabulary: 8 essential words (German/English).
+    1. missionGoal: A 1-sentence strategic objective (e.g. "Master the verb 'sein' to introduce yourself.").
+    2. vocabulary: 8 essential words (German/English) relevant to the scenario.
     3. lesson:
        - title: The specific Grammar Rule name.
-       - explanation: A detailed, step-by-step explanation of the rule. Explain *how* it works and *when* to use it. (approx 3-4 sentences).
-       - keyPoints: 3 concise bullet points summarizing the most important takeaways.
-       - example: A sentence demonstrating the rule in the context of the mission.
-       - grammarTable: A structured table to visualize the rule. Must include 'headers' (list of strings) and 'rows' (list of lists of strings).
-       - commonMistakes: 2-3 common errors learners make with this specific rule.
+       - explanation: A detailed, step-by-step explanation. DO NOT truncate. Explain *how* and *when* to use it. (approx 4-5 sentences).
+       - keyPoints: 3 concise bullet points.
+       - example: A sentence demonstrating the rule in context.
+       - grammarTable: A structured table. 'headers' (list of strings) and 'rows' (list of lists of strings).
+       - commonMistakes: 2-3 common errors.
     4. keyPhrases: 4 useful sentences for the scenario.
-    5. culturalFact: A fascinating tidbit about Germany related to the scenario.
-    6. quiz: One tricky multiple-choice question testing the *Grammar Rule*.
+    5. culturalFact: A fascinating tidbit about Germany.
+    6. strategyTip: A specific linguistic or cultural hack to succeed in this mission (e.g., "In German, always look the person in the eye when toasting.").
+    7. quiz: One tricky multiple-choice question testing the *Grammar Rule*.
   `;
 
   const schema = {
@@ -122,8 +123,7 @@ export const generateMissionBriefing = async (
             properties: {
               headers: { type: Type.ARRAY, items: { type: Type.STRING } },
               rows: { type: Type.ARRAY, items: { type: Type.ARRAY, items: { type: Type.STRING } } }
-            },
-            description: "Optional visualization of the rule (conjugation, declension table)."
+            }
           },
           commonMistakes: { type: Type.ARRAY, items: { type: Type.STRING } }
         }
@@ -136,12 +136,13 @@ export const generateMissionBriefing = async (
         }
       },
       culturalFact: { type: Type.STRING },
+      strategyTip: { type: Type.STRING },
       quiz: {
         type: Type.OBJECT,
         properties: {
           question: { type: Type.STRING },
           options: { type: Type.ARRAY, items: { type: Type.STRING } },
-          correctAnswer: { type: Type.INTEGER, description: "Index of the correct option (0-3)" }
+          correctAnswer: { type: Type.INTEGER }
         }
       }
     }
@@ -153,11 +154,11 @@ export const generateMissionBriefing = async (
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        responseSchema: schema
+        responseSchema: schema,
+        thinkingConfig: { thinkingBudget: 1024 } // Ensure AI thinks to generate complete content
       }
     });
     
-    // Parse
     const data = JSON.parse(response.text || "{}");
     
     // PARTIAL RECOVERY STRATEGY
@@ -174,6 +175,7 @@ export const generateMissionBriefing = async (
         },
         keyPhrases: Array.isArray(data.keyPhrases) ? data.keyPhrases : [],
         culturalFact: data.culturalFact || "German is spoken by over 100 million people worldwide.",
+        strategyTip: data.strategyTip || "Take your time and speak clearly.",
         quiz: data.quiz || {
             question: "Ready to start the mission?",
             options: ["Ja! (Yes)", "Nein (No)"],
@@ -188,7 +190,6 @@ export const generateMissionBriefing = async (
     }
 
     if (safeBriefing.vocabulary.length === 0 && safeBriefing.keyPhrases.length === 0 && !data.lesson) {
-        console.warn("Gemini response empty:", data);
         throw new Error("Briefing data completely empty");
     }
     
@@ -212,6 +213,7 @@ export const generateMissionBriefing = async (
       },
       keyPhrases: [{ german: 'Ich möchte...', english: 'I would like...' }, { german: 'Können Sie mir helfen?', english: 'Can you help me?'}],
       culturalFact: 'Germany has over 20,000 castles and a rich history of folklore.',
+      strategyTip: 'When in doubt, smile and use the formal "Sie". Politeness opens doors.',
       quiz: { 
         question: 'Which pronoun is used for formal address?', 
         options: ['du', 'ihr', 'Sie', 'er'], 
@@ -232,14 +234,14 @@ export const generateMissionStart = async (
     Scenario: ${module.title}.
     User Level: ${user.level}.
     
-    IMPORTANT INSTRUCTION: 
-    For A1/A2 users, strictly use simple grammar (Present Tense, simple Perfect). 
-    Avoid complex subordinate clauses.
-    Ensure "Suggested Responses" are very simple and easy to build.
+    STRICT LANGUAGE CONTROL (CEFR):
+    - A1: Use ONLY Present Tense. Short, simple sentences (Subject-Verb-Object). High-frequency vocabulary.
+    - A2: Use Present and simple Perfect Tense. Connectors: und, aber, oder.
+    - B1+: More complex structures allowed.
     
     Goal: Start the roleplay.
     1. Set the scene in English (narrative).
-    2. Initiate the dialogue in German.
+    2. Initiate the dialogue in German (adhering to Level ${user.level}).
     3. Define 3 specific objectives for the user.
     4. Provide 3 Suggested Responses (Simple German sentences).
   `;
@@ -286,6 +288,7 @@ export const processTurn = async (
   const prompt = `
     Roleplay Context: ${module.title} (${module.description}).
     Current Objectives: ${JSON.stringify(currentObjectives)}.
+    Module Level: ${module.level}
     
     Previous Conversation History:
     ${conversationHistory}
@@ -293,15 +296,17 @@ export const processTurn = async (
     Latest User Input: "${userMessage}"
     
     Instruction:
+    - Act as the Local Guide.
+    - STRICTLY adapt your German response to Level ${module.level}. (A1/A2 = Simple sentences, no complex sub-clauses).
     - If user grammar is bad, gently correct in 'correction' field, but accept the input if understandable.
     - Provide "Suggested Responses" that match the user's level (Simple for A1/A2).
     - Check if ALL objectives are met. If so, set missionStatus to "completed".
-    - If missionStatus is "completed", you MUST provide a "performanceReview" object with strengths, weaknesses, and feedback based on the user's performance in this conversation.
+    - If missionStatus is "completed", you MUST provide a "performanceReview".
 
     Task:
     1. Evaluate the user's German input.
     2. Check if objectives are met.
-    3. Reply as the Local Guide.
+    3. Reply as the Local Guide (Level-Appropriate).
     4. Provide 3 NEW Suggested Responses.
     5. Update missionStatus and generate review if done.
   `;
@@ -409,7 +414,8 @@ export const generateGrammarLesson = async (level: string, topic: string): Promi
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        responseSchema: schema
+        responseSchema: schema,
+        thinkingConfig: { thinkingBudget: 1024 }
       }
     });
     

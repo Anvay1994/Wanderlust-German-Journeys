@@ -6,6 +6,8 @@ export enum AppState {
   PROFILE = 'PROFILE',
   STORE = 'STORE',
   GUIDEBOOK = 'GUIDEBOOK',
+  ANALYTICS = 'ANALYTICS',
+  LEARNING_STRATEGY = 'LEARNING_STRATEGY',
   ADMIN = 'ADMIN'
 }
 
@@ -82,6 +84,7 @@ export interface MissionBriefing {
   };
   keyPhrases: { german: string; english: string }[];
   culturalFact: string;
+  strategyTip?: string; // New field for specific linguistic or cultural hack
   quiz: {
     question: string;
     options: string[];

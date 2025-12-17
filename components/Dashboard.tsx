@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { UserProfile, CurriculumModule, GermanLevel } from '../types';
 import { CURRICULUM } from '../constants';
 import Button from './Button';
-import { Lock, CheckCircle2, Coins, MapPin, TrendingUp, Book, Compass, HelpCircle, X, Zap, Ticket, CreditCard, Tag, Terminal, PlusCircle, Unlock, RotateCcw, ShieldAlert, Dumbbell, Type, Hash } from 'lucide-react';
+import { Lock, CheckCircle2, Coins, MapPin, TrendingUp, Book, Compass, HelpCircle, X, Zap, Ticket, CreditCard, Tag, Terminal, PlusCircle, Unlock, RotateCcw, ShieldAlert, Dumbbell, Type, Hash, PieChart, Lightbulb } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface DashboardProps {
@@ -11,11 +11,13 @@ interface DashboardProps {
   onOpenStore: () => void;
   onOpenLevelPurchase: (level: GermanLevel) => void;
   onOpenGuidebook: () => void;
+  onOpenAnalytics: () => void;
+  onOpenStrategy: () => void;
   onUnlockModule: (moduleId: string, cost: number) => void;
   onDevAction?: (action: 'add_credits' | 'unlock_all' | 'reset' | 'open_admin') => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore, onOpenLevelPurchase, onOpenGuidebook, onDevAction }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore, onOpenLevelPurchase, onOpenGuidebook, onOpenAnalytics, onOpenStrategy, onDevAction }) => {
   const [showTokenInfo, setShowTokenInfo] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
   
@@ -217,6 +219,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
           </div>
           
           <div className="flex gap-8 mt-6 md:mt-0">
+             
+            {/* Strategy Button */}
+            <div className="flex flex-col items-center cursor-pointer hover:bg-stone-50 p-2 rounded group" onClick={onOpenStrategy}>
+               <span className="text-xs text-stone-400 uppercase tracking-wider font-bold group-hover:text-amber-500 transition-colors">How to Play</span>
+               <div className="text-xl font-display font-bold text-amber-500">
+                  <Lightbulb className="w-6 h-6" />
+               </div>
+            </div>
+
             {/* Tokens - Clickable for Info */}
             <button 
                onClick={() => setShowTokenInfo(true)} 
@@ -231,7 +242,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
               </div>
             </button>
 
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center cursor-pointer hover:bg-stone-50 p-2 rounded" onClick={onOpenAnalytics}>
               <span className="text-xs text-stone-400 uppercase tracking-wider font-bold">Miles Traveled</span>
               <div className="text-xl font-display font-bold text-[#059669]">{user.xp} km</div>
             </div>
@@ -376,14 +387,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
             })}
           </div>
 
-          {/* Side Panel: Analytics */}
+          {/* Side Panel: Analytics Preview */}
           <div className="space-y-8 min-w-0">
             
             <div className="bg-white border border-stone-200 p-6 rounded-lg shadow-sm min-w-0">
-              <h3 className="text-lg font-display text-stone-800 mb-4 flex items-center">
-                <TrendingUp className="w-5 h-5 mr-2 text-[#059669]" /> 
-                Travel Skills
-              </h3>
+              <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-lg font-display text-stone-800 flex items-center">
+                   <TrendingUp className="w-5 h-5 mr-2 text-[#059669]" /> 
+                   Travel Skills
+                 </h3>
+                 <button onClick={onOpenAnalytics} className="text-xs font-bold text-[#059669] hover:underline flex items-center gap-1">
+                    Full Report <PieChart size={12}/>
+                 </button>
+              </div>
               <div className="h-64 w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={progressData}>
