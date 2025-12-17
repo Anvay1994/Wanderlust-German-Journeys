@@ -10,7 +10,7 @@ import Analytics from './components/Analytics';
 import LearningStrategy from './components/LearningStrategy';
 import AdminConsole from './components/AdminConsole';
 import { Loader2 } from 'lucide-react';
-import { supabase, mapProfileToUser, updateUserProfile, recordPurchase } from './services/supabaseClient';
+import { supabase, mapProfileToUser, updateUserProfile } from './services/supabaseClient';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.ONBOARDING);
@@ -142,29 +142,15 @@ const App: React.FC = () => {
     setAppState(AppState.DASHBOARD);
   };
 
-  const handlePurchaseLevel = (level: GermanLevel, tokensRedeemed: number) => {
-    if (user) {
-      const newCredits = Math.max(0, user.credits - tokensRedeemed);
-      const newOwned = [...user.ownedLevels, level];
-
-      const updatedUser = { 
-        ...user, 
-        credits: newCredits, 
-        ownedLevels: newOwned 
-      };
-      
-      // Optimistic
-      setUser(updatedUser);
-      
-      // DB Updates (Only if logged in)
-      if (userId) {
-        updateUserProfile(userId, { credits: newCredits, ownedLevels: newOwned });
-        const price = level === GermanLevel.A1 ? 1499 : 2999;
-        recordPurchase(userId, `LEVEL_${level}`, price - tokensRedeemed);
-      }
-      
-      setPreSelectedLevel(null);
-    }
+  const handlePurchaseLevel = (level: GermanLevel, creditsRemaining: number, ownedLevels: GermanLevel[]) => {
+    if (!user) return;
+    const updatedUser = {
+      ...user,
+      credits: creditsRemaining,
+      ownedLevels
+    };
+    setUser(updatedUser);
+    setPreSelectedLevel(null);
   };
 
   const handleOpenStoreForLevel = (level: GermanLevel) => {

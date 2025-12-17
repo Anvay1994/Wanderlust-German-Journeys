@@ -1,8 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CurriculumModule, UserProfile, GermanLevel, SuggestedResponse, MissionBriefing, ChatMessage, PerformanceReview, PracticeDrill } from "../types";
 
-// Use Vite environment variable or fallback to the provided key
-const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 'AIzaSyAsfWTh2Nkg9VTmMirhqoR2CmH_eyITcgM';
+// Use Vite environment variable for the Gemini API key
+const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
 
 const ai = new GoogleGenAI({ apiKey });
 

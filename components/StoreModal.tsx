@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, Loader2, Coins, Briefcase, CreditCard, Tag, AlertCircle, Zap, TrendingUp, Stamp, Ticket, Smartphone, Landmark } from 'lucide-react';
 import Button from './Button';
 import { GermanLevel, UserProfile } from '../types';
+import { supabase } from '../services/supabaseClient';
 
 interface StoreModalProps {
   onClose: () => void;
-  onPurchaseLevel: (level: GermanLevel, tokensRedeemed: number) => void;
+  onPurchaseLevel: (level: GermanLevel, creditsRemaining: number, ownedLevels: GermanLevel[]) => void;
   user: UserProfile;
   initialLevel?: GermanLevel | null;
 }
@@ -16,6 +17,8 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
   const [view, setView] = useState<StoreView>(initialLevel ? 'CHECKOUT' : 'CATALOGUE');
   const [selectedLevel, setSelectedLevel] = useState<GermanLevel | null>(initialLevel || null);
   const [processing, setProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [transactionId, setTransactionId] = useState<string | null>(null);
   
   // INDIA MARKET DEFAULT
   // We default to INR as the primary strategy.
@@ -54,6 +57,7 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
   // Reset tokens when level changes
   useEffect(() => {
     setTokensToUse(0);
+    setPaymentError(null);
   }, [selectedLevel]);
 
   const maxUsableTokens = Math.min(user.credits, maxTokensForDiscount);
@@ -73,16 +77,122 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
     };
   };
 
-  const handleCheckout = () => {
+  const loadRazorpayScript = () =>
+    new Promise<boolean>((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+
+  const handleCheckout = async () => {
     if (!selectedLevel) return;
     setProcessing(true);
-    
-    // Simulate API Transaction
-    setTimeout(() => {
-      onPurchaseLevel(selectedLevel, tokensToUse);
+    setPaymentError(null);
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setPaymentError('Please sign in to complete this purchase.');
       setProcessing(false);
-      setView('SUCCESS');
-    }, 2000);
+      return;
+    }
+
+    try {
+      const orderResponse = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          level: selectedLevel,
+          tokensRedeemed: tokensToUse
+        })
+      });
+
+      const orderData = await orderResponse.json().catch(() => ({}));
+      if (!orderResponse.ok) {
+        setPaymentError(orderData.error || 'Unable to start payment.');
+        setProcessing(false);
+        return;
+      }
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded || !(window as any).Razorpay) {
+        setPaymentError('Payment gateway failed to load. Please try again.');
+        setProcessing(false);
+        return;
+      }
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: orderData.name,
+        description: orderData.description,
+        order_id: orderData.orderId,
+        prefill: {
+          name: user.name
+        },
+        theme: {
+          color: '#059669'
+        },
+        modal: {
+          ondismiss: () => setProcessing(false)
+        },
+        handler: async (response: any) => {
+          try {
+            setProcessing(true);
+            const verifyResponse = await fetch('/api/razorpay/verify-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`
+              },
+              body: JSON.stringify({
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+                level: selectedLevel
+              })
+            });
+
+            const verifyData = await verifyResponse.json().catch(() => ({}));
+            if (!verifyResponse.ok || !verifyData.success) {
+              setPaymentError(verifyData.error || 'Payment verification failed.');
+              setProcessing(false);
+              return;
+            }
+
+            onPurchaseLevel(selectedLevel, verifyData.credits, verifyData.ownedLevels);
+            setTransactionId(verifyData.transactionId || response.razorpay_payment_id);
+            setView('SUCCESS');
+          } catch (error) {
+            setPaymentError('Payment verification failed. Please contact support.');
+          } finally {
+            setProcessing(false);
+          }
+        }
+      };
+
+      const razorpay = new (window as any).Razorpay(options);
+      razorpay.on('payment.failed', (response: any) => {
+        setPaymentError(response?.error?.description || 'Payment failed.');
+        setProcessing(false);
+      });
+      razorpay.open();
+    } catch (error) {
+      setPaymentError('Payment setup failed. Please try again.');
+      setProcessing(false);
+    } finally {
+      // Keep processing state managed by Razorpay callbacks.
+    }
   };
 
   const formatCurrency = (val: number) => {
@@ -93,6 +203,7 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
 
   // --- RENDER SUCCESS VIEW ---
   if (view === 'SUCCESS') {
+    const successId = transactionId || `UPI-${Date.now().toString().slice(-6)}`;
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-sm p-4 animate-fade-in">
          <div className="bg-white w-full max-w-md relative shadow-2xl rounded-xl overflow-hidden text-center p-8 border-t-8 border-[#059669]">
@@ -110,7 +221,7 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
 
             <div className="bg-stone-50 p-4 rounded-lg border border-stone-200 mb-8 flex items-center justify-between text-sm">
                <span className="text-stone-500">Transaction ID</span>
-               <span className="font-mono font-bold text-stone-400">#UPI-{Date.now().toString().slice(-6)}</span>
+               <span className="font-mono font-bold text-stone-400">#{successId}</span>
             </div>
 
             <Button onClick={onClose} className="w-full py-4 text-lg">
@@ -258,6 +369,9 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
                       `Pay ${rawFinal === 0 ? '' : currency.symbol}${finalPrice}`
                    )}
                 </Button>
+                {paymentError && (
+                  <div className="text-sm text-red-600 text-center">{paymentError}</div>
+                )}
                 <button 
                   onClick={() => { setView('CATALOGUE'); setSelectedLevel(null); }} 
                   className="w-full text-center text-stone-500 text-sm hover:text-stone-800"

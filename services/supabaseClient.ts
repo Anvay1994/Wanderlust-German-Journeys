@@ -1,13 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { UserProfile, GermanLevel } from '../types';
 
-// Access environment variables with hardcoded fallbacks from your provided env.txt
-// This ensures the app works immediately even if the .env file isn't being read correctly.
-const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bzwdxfjdrkoomzsvpidk.supabase.co';
-const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'sb_publishable_65nX0uP7fuAm1ZDOd-LDUg_oZa46Mqm';
+// Access environment variables (required for production).
+const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
 // Initialize the Supabase client
-export const supabase = (supabaseUrl && supabaseAnonKey) 
+export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey)
   : {
       // Mock implementation should rarely be hit now that we have fallbacks
