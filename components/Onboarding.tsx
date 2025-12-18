@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import { UserProfile, GermanLevel } from '../types';
 import { INTERESTS_LIST } from '../constants';
 import Button from './Button';
-import { Plane, Map, Globe, BookOpen, CheckCircle2, GraduationCap, ArrowRight, Lock, Mail, Key, UserCircle2 } from 'lucide-react';
+import { Plane, Map, Globe, BookOpen, CheckCircle2, GraduationCap, ArrowRight, Lock, Mail, Key } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 
 interface OnboardingProps {
   onComplete: (profile: UserProfile) => void;
-  onGuestLogin?: () => void;
 }
 
 const PLACEMENT_TEST = [
@@ -74,7 +73,7 @@ const PLACEMENT_TEST = [
   }
 ];
 
-const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onGuestLogin }) => {
+const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const { playSound } = useSoundEffects();
   const [step, setStep] = useState(1);
   
@@ -354,15 +353,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onGuestLogin }) => 
                >
                   {authLoading ? 'Verifying...' : (isLoginMode ? 'Unlock Passport' : 'Create Identity')}
                </Button>
-               
-               {onGuestLogin && (
-                 <button 
-                   onClick={onGuestLogin}
-                   className="w-full py-2 text-stone-400 text-sm font-bold hover:text-stone-600 flex items-center justify-center gap-2 transition-colors"
-                 >
-                   <UserCircle2 size={16} /> Continue as Guest (Offline Mode)
-                 </button>
-               )}
              </div>
           </div>
         )}

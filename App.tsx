@@ -87,24 +87,6 @@ const App: React.FC = () => {
     setAppState(AppState.DASHBOARD);
   };
 
-  const handleGuestLogin = () => {
-    // Create a temporary guest profile
-    const guestUser: UserProfile = {
-      name: 'Guest Traveler',
-      level: GermanLevel.A1,
-      interests: ['Culture', 'Food'],
-      credits: 500,
-      xp: 0,
-      streak: 1,
-      completedModules: [],
-      unlockedModules: ['A1.1', 'A1.2', 'A1.3', 'A1.4', 'A1.5', 'A1.6'],
-      ownedLevels: []
-    };
-    setUser(guestUser);
-    setUserId(null); // Explicitly null to indicate no DB sync
-    setAppState(AppState.DASHBOARD);
-  };
-
   const handleSelectModule = (module: CurriculumModule) => {
     setActiveModule(module);
     setAppState(AppState.GAME_SESSION);
@@ -227,7 +209,6 @@ const App: React.FC = () => {
       {appState === AppState.ONBOARDING && (
         <Onboarding 
           onComplete={handleOnboardingComplete} 
-          onGuestLogin={handleGuestLogin}
         />
       )}
 
