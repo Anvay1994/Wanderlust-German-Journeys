@@ -101,7 +101,10 @@ export const generateMissionBriefing = async (
     4. keyPhrases: 4 useful sentences for the scenario.
     5. culturalFact: A fascinating tidbit about Germany.
     6. strategyTip: A specific linguistic or cultural hack to succeed in this mission (e.g., "In German, always look the person in the eye when toasting.").
-    7. quiz: One tricky multiple-choice question testing the *Grammar Rule*.
+    7. securityClearance: EXACTLY 5 multiple-choice questions testing the *Grammar Rule*.
+       - Each question has 4 options.
+       - correctAnswer is an index 0-3.
+       - Include a short explanation for why the correct option is correct.
   `;
 
   const schema = {
@@ -141,12 +144,16 @@ export const generateMissionBriefing = async (
       },
       culturalFact: { type: Type.STRING },
       strategyTip: { type: Type.STRING },
-      quiz: {
-        type: Type.OBJECT,
-        properties: {
-          question: { type: Type.STRING },
-          options: { type: Type.ARRAY, items: { type: Type.STRING } },
-          correctAnswer: { type: Type.INTEGER }
+      securityClearance: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            question: { type: Type.STRING },
+            options: { type: Type.ARRAY, items: { type: Type.STRING } },
+            correctAnswer: { type: Type.INTEGER },
+            explanation: { type: Type.STRING }
+          }
         }
       }
     }
@@ -180,11 +187,8 @@ export const generateMissionBriefing = async (
         keyPhrases: Array.isArray(data.keyPhrases) ? data.keyPhrases : [],
         culturalFact: data.culturalFact || "German is spoken by over 100 million people worldwide.",
         strategyTip: data.strategyTip || "Take your time and speak clearly.",
-        quiz: data.quiz || {
-            question: "Ready to start the mission?",
-            options: ["Ja! (Yes)", "Nein (No)"],
-            correctAnswer: 0
-        }
+        quiz: data.quiz,
+        securityClearance: Array.isArray(data.securityClearance) ? data.securityClearance : []
     };
 
     if (safeBriefing.lesson.grammarTable) {
@@ -195,6 +199,18 @@ export const generateMissionBriefing = async (
 
     if (safeBriefing.vocabulary.length === 0 && safeBriefing.keyPhrases.length === 0 && !data.lesson) {
         throw new Error("Briefing data completely empty");
+    }
+
+    if (!Array.isArray(safeBriefing.securityClearance) || safeBriefing.securityClearance.length < 5) {
+      safeBriefing.securityClearance = [
+        ...(safeBriefing.securityClearance || []),
+        {
+          question: "Which option is correct?",
+          options: ["Option A", "Option B", "Option C", "Option D"],
+          correctAnswer: 0,
+          explanation: "Fallback question. Configure the AI key to generate full clearance."
+        }
+      ].slice(0, 5);
     }
     
     return safeBriefing;
@@ -218,11 +234,13 @@ export const generateMissionBriefing = async (
       keyPhrases: [{ german: 'Ich möchte...', english: 'I would like...' }, { german: 'Können Sie mir helfen?', english: 'Can you help me?'}],
       culturalFact: 'Germany has over 20,000 castles and a rich history of folklore.',
       strategyTip: 'When in doubt, smile and use the formal "Sie". Politeness opens doors.',
-      quiz: { 
-        question: 'Which pronoun is used for formal address?', 
-        options: ['du', 'ihr', 'Sie', 'er'], 
-        correctAnswer: 2 
-      }
+      securityClearance: [
+        { question: 'Which pronoun is used for formal address?', options: ['du', 'ihr', 'Sie', 'er'], correctAnswer: 2, explanation: 'Sie (capitalized) is the formal form.' },
+        { question: 'What is the correct form of "sein" for "ich"?', options: ['bist', 'bin', 'ist', 'seid'], correctAnswer: 1, explanation: '"Ich bin" is correct.' },
+        { question: 'Which word means "thank you"?', options: ['Bitte', 'Danke', 'Hallo', 'Tschüss'], correctAnswer: 1, explanation: 'Danke means thank you.' },
+        { question: 'Where does the conjugated verb go in a main clause?', options: ['Last', 'Second position', 'Always first', 'Anywhere'], correctAnswer: 1, explanation: 'In main clauses, the verb is position 2.' },
+        { question: 'Which article is always used for plural (nominative)?', options: ['der', 'die', 'das', 'ein'], correctAnswer: 1, explanation: 'Plural nouns use "die".' }
+      ]
     };
   }
 };
@@ -339,16 +357,40 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
   const model = "gemini-2.5-flash";
   const ai = getAiClient();
   const prompt = `
-    Generate 5 German sentence formation challenges (Drills) for a student at level ${level}.
-    ${topic ? `Focus specifically on the grammar topic: "${topic}".` : "Cover various grammar topics appropriate for this level."}
-    
-    Output JSON Array with 5 objects:
-    - id: unique string (e.g. "drill-1")
+    Generate 5 Training Gym challenges for a German learner (CEFR ${level}).
+    ${topic ? `Focus on the grammar topic: "${topic}".` : "Cover various grammar topics appropriate for this level."}
+
+    STRICT CEFR RULES:
+    - A1: Present tense only. Very short, simple sentences. High-frequency vocab.
+    - A2: Present + simple Perfect. Simple connectors (und/aber/oder).
+    - B1+: More complex structures allowed, but keep it learnable.
+
+    The 5 challenges MUST be a mix of types:
+    - At least 3 are multiple-choice (type "mcq")
+    - At least 1 is matching pairs (type "match")
+
+    Output JSON Array with 5 objects matching this exact schema:
+    - id: unique string
     - level: "${level}"
-    - category: Grammar category title (e.g. "Perfect Tense", "Word Order")
-    - english: The sentence in English to translate.
-    - german: The correct German translation.
-    - hint: A helpful grammatical hint (e.g. "Remember the verb goes at the end").
+    - category: short category title
+    - type: "mcq" | "match"
+    - prompt: short instruction shown to the learner
+    - correctFeedback: short helpful feedback when correct
+    - wrongFeedback: short helpful feedback when wrong (what to work on)
+
+    For type "mcq":
+    - question: string
+    - options: string[] (exactly 4)
+    - correctIndex: number (0-3)
+
+    For type "match":
+    - leftItems: { id: string, text: string }[] (3-5 items)
+    - rightItems: { id: string, text: string }[] (same count, shuffled order)
+    - answerMap: Record<leftId, rightId>
+
+    Important:
+    - Make distractors plausible but clearly wrong.
+    - Keep everything appropriate for CEFR ${level}.
   `;
 
   const schema = {
@@ -359,9 +401,34 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
         id: { type: Type.STRING },
         level: { type: Type.STRING },
         category: { type: Type.STRING },
-        english: { type: Type.STRING },
-        german: { type: Type.STRING },
-        hint: { type: Type.STRING }
+        type: { type: Type.STRING, enum: ["mcq", "match"] },
+        prompt: { type: Type.STRING },
+        question: { type: Type.STRING },
+        options: { type: Type.ARRAY, items: { type: Type.STRING } },
+        correctIndex: { type: Type.INTEGER },
+        leftItems: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              text: { type: Type.STRING }
+            }
+          }
+        },
+        rightItems: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              text: { type: Type.STRING }
+            }
+          }
+        },
+        answerMap: { type: Type.OBJECT },
+        correctFeedback: { type: Type.STRING },
+        wrongFeedback: { type: Type.STRING }
       }
     }
   };
@@ -375,7 +442,8 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
             responseSchema: schema
         }
     });
-    return JSON.parse(response.text || "[]");
+    const drills = JSON.parse(response.text || "[]");
+    return Array.isArray(drills) ? drills : [];
   } catch (e) {
       console.error(e);
       return [];

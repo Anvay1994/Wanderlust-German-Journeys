@@ -85,18 +85,31 @@ export interface MissionBriefing {
   keyPhrases: { german: string; english: string }[];
   culturalFact: string;
   strategyTip?: string; // New field for specific linguistic or cultural hack
-  quiz: {
+  quiz?: {
     question: string;
     options: string[];
     correctAnswer: number; // Index 0-3
   };
+  securityClearance?: {
+    question: string;
+    options: string[];
+    correctAnswer: number; // Index 0-3
+    explanation?: string;
+  }[];
 }
 
 export interface PracticeDrill {
   id: string;
   level: GermanLevel;
   category: string;
-  english: string;
-  german: string; // Solution
-  hint?: string;
+  type: 'mcq' | 'match';
+  prompt: string;
+  question?: string;
+  options?: string[];
+  correctIndex?: number;
+  leftItems?: { id: string; text: string }[];
+  rightItems?: { id: string; text: string }[];
+  answerMap?: Record<string, string>;
+  correctFeedback: string;
+  wrongFeedback: string;
 }

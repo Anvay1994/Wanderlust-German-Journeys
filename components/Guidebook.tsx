@@ -35,9 +35,9 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
   // Drill State
   const [drills, setDrills] = useState<PracticeDrill[]>([]);
   const [loadingDrills, setLoadingDrills] = useState(false);
-  const [revealedDrill, setRevealedDrill] = useState<string | null>(null);
-  const [userDrillInputs, setUserDrillInputs] = useState<Record<string, string>>({});
-  const [listeningDrillId, setListeningDrillId] = useState<string | null>(null);
+  const [mcqAnswers, setMcqAnswers] = useState<Record<string, number>>({});
+  const [matchAnswers, setMatchAnswers] = useState<Record<string, Record<string, string>>>({});
+  const [matchChecked, setMatchChecked] = useState<Record<string, boolean>>({});
 
   // Dynamic Content State
   const [generatedChapters, setGeneratedChapters] = useState<Record<string, GrammarLesson>>({});
@@ -50,47 +50,15 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
     window.speechSynthesis.speak(utterance);
   };
 
-  const startListening = (drillId: string) => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'de-DE';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      setListeningDrillId(drillId);
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setUserDrillInputs(prev => ({
-          ...prev,
-          [drillId]: transcript
-        }));
-        setListeningDrillId(null);
-      };
-
-      recognition.onerror = () => {
-        setListeningDrillId(null);
-        alert("Microphone access needed for oral practice.");
-      };
-
-      recognition.onend = () => setListeningDrillId(null);
-
-      recognition.start();
-    } else {
-      alert("Speech recognition not supported in this browser. Please use Chrome/Edge.");
-    }
-  };
-
   const handleGenerateDrills = async () => {
     setLoadingDrills(true);
     setDrills([]);
     try {
       const newDrills = await generatePracticeDrills(level);
       setDrills(newDrills);
-      // Reset inputs
-      setUserDrillInputs({});
-      setRevealedDrill(null);
+      setMcqAnswers({});
+      setMatchAnswers({});
+      setMatchChecked({});
     } catch (error) {
       console.error("Failed to generate drills", error);
     } finally {
@@ -624,7 +592,7 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
                 <header className="mb-8 flex justify-between items-end">
                    <div>
                       <h2 className="text-3xl font-display font-bold text-stone-800">Training Gym</h2>
-                      <p className="text-stone-500">Construct sentences. Translate the prompt. Speak clearly.</p>
+                      <p className="text-stone-500">MCQs and matching drills tailored to Level {level}.</p>
                    </div>
                    {drills.length > 0 && (
                       <Button size="sm" variant="secondary" onClick={handleGenerateDrills} disabled={loadingDrills}>
@@ -662,83 +630,151 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
                      </div>
                      
                      <div className="p-6">
-                        <h3 className="text-xl font-bold text-stone-800 mb-2">"{drill.english}"</h3>
-                        
-                        {drill.hint && revealedDrill !== drill.id && (
-                           <p className="text-sm text-amber-600 mb-4 flex items-center gap-1">
-                             <AlertTriangle size={12} /> Hint: {drill.hint}
-                           </p>
-                        )}
+                        <div className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-2">{drill.prompt}</div>
 
                         <div className="space-y-4">
-                           {/* Input Area */}
-                           <div className="flex gap-2">
-                             <div className="relative flex-1">
-                               <input 
-                                 type="text" 
-                                 placeholder="Type the German translation..."
-                                 className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg focus:border-[#059669] outline-none pr-10"
-                                 value={revealedDrill === drill.id ? drill.german : (userDrillInputs[drill.id] || '')}
-                                 onChange={(e) => setUserDrillInputs(prev => ({...prev, [drill.id]: e.target.value}))}
-                                 disabled={revealedDrill === drill.id}
-                               />
-                               {revealedDrill === drill.id && (
-                                 <Check className="absolute right-3 top-3.5 text-[#059669]" size={20} />
-                               )}
-                             </div>
-                             
-                             <button 
-                               onClick={() => startListening(drill.id)}
-                               disabled={revealedDrill === drill.id || listeningDrillId !== null}
-                               className={`p-3 rounded-lg border-2 transition-all ${listeningDrillId === drill.id ? 'bg-red-50 border-red-500 text-red-500 animate-pulse' : 'border-stone-200 text-stone-400 hover:text-[#059669] hover:border-[#059669]'}`}
-                               title="Speak Answer"
-                             >
-                               <Mic size={20} />
-                             </button>
-                           </div>
+                          {drill.type === 'mcq' && (
+                            <div className="space-y-3">
+                              <h3 className="text-xl font-bold text-stone-800">{drill.question}</h3>
+                              <div className="space-y-3">
+                                {(drill.options || []).map((opt, i) => {
+                                  const selected = mcqAnswers[drill.id];
+                                  const isAnswered = typeof selected === 'number';
+                                  const isCorrect = isAnswered && selected === drill.correctIndex;
+                                  const isThisSelected = selected === i;
 
-                           {/* Controls */}
-                           {revealedDrill !== drill.id ? (
-                              <div className="flex justify-between items-center">
-                                 <button 
-                                    onClick={() => setUserDrillInputs(prev => ({...prev, [drill.id]: ''}))}
-                                    className="text-stone-400 hover:text-stone-600 text-sm flex items-center gap-1"
-                                 >
-                                   <RefreshCw size={14} /> Clear
-                                 </button>
-                                 <Button 
-                                   size="sm" 
-                                   onClick={() => { 
-                                     setRevealedDrill(drill.id); 
-                                     setUserDrillInputs(prev => ({...prev, [drill.id]: ''})); 
-                                   }}
-                                   variant="secondary"
-                                 >
-                                    <Eye size={16} /> Reveal Solution
-                                 </Button>
-                              </div>
-                           ) : (
-                              <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-lg animate-fade-in mt-4">
-                                 <div className="flex justify-between items-center mb-2">
-                                    <span className="text-xs font-bold text-emerald-800 uppercase tracking-widest">Correct Answer</span>
-                                    <button onClick={() => playAudio(drill.german)} className="text-[#059669] hover:text-emerald-800">
-                                       <Volume2 size={20} />
-                                    </button>
-                                 </div>
-                                 <p className="text-lg font-bold text-stone-800">{drill.german}</p>
-                                 <div className="mt-4 flex justify-end">
-                                    <button 
-                                       onClick={() => { 
-                                         setRevealedDrill(null); 
-                                         setUserDrillInputs(prev => ({...prev, [drill.id]: ''})); 
-                                       }} 
-                                       className="text-sm font-bold text-stone-500 hover:text-stone-800"
+                                  const base = 'w-full p-4 rounded-lg text-left font-bold border-2 transition-all text-lg';
+                                  const cls = isThisSelected
+                                    ? (isCorrect
+                                      ? 'bg-green-100 border-green-500 text-green-700'
+                                      : 'bg-red-100 border-red-500 text-red-700')
+                                    : 'border-stone-200 hover:border-stone-400 bg-stone-50 text-stone-800';
+
+                                  return (
+                                    <button
+                                      key={i}
+                                      onClick={() => setMcqAnswers(prev => ({ ...prev, [drill.id]: i }))}
+                                      disabled={isAnswered}
+                                      className={`${base} ${cls}`}
                                     >
-                                       Try Again
+                                      {opt}
                                     </button>
-                                 </div>
+                                  );
+                                })}
                               </div>
-                           )}
+
+                              {typeof mcqAnswers[drill.id] === 'number' && (
+                                <div className={`mt-3 p-4 rounded-lg border ${mcqAnswers[drill.id] === drill.correctIndex ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+                                  <div className="font-bold mb-1">
+                                    {mcqAnswers[drill.id] === drill.correctIndex ? 'Correct' : 'Not quite'}
+                                  </div>
+                                  <div className="text-sm leading-relaxed">
+                                    {mcqAnswers[drill.id] === drill.correctIndex ? drill.correctFeedback : drill.wrongFeedback}
+                                  </div>
+                                  <div className="mt-3 flex justify-end">
+                                    <button
+                                      onClick={() => setMcqAnswers(prev => {
+                                        const copy = { ...prev };
+                                        delete copy[drill.id];
+                                        return copy;
+                                      })}
+                                      className="text-sm font-bold text-stone-500 hover:text-stone-800"
+                                    >
+                                      Try Again
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {drill.type === 'match' && (
+                            <div className="space-y-4">
+                              <div className="text-lg font-bold text-stone-800">Match the pairs</div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-3">
+                                  {(drill.leftItems || []).map((left) => (
+                                    <div key={left.id} className="p-3 bg-stone-50 border border-stone-200 rounded-lg">
+                                      <div className="font-bold text-stone-800 mb-2">{left.text}</div>
+                                      <select
+                                        className="w-full p-2 rounded border border-stone-200 bg-white"
+                                        value={(matchAnswers[drill.id] || {})[left.id] || ''}
+                                        onChange={(e) => setMatchAnswers(prev => ({
+                                          ...prev,
+                                          [drill.id]: {
+                                            ...(prev[drill.id] || {}),
+                                            [left.id]: e.target.value
+                                          }
+                                        }))}
+                                      >
+                                        <option value="" disabled>Select a match...</option>
+                                        {(drill.rightItems || []).map((right) => (
+                                          <option key={right.id} value={right.id}>{right.text}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="bg-white border border-stone-200 rounded-lg p-4">
+                                  <div className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-3">Options</div>
+                                  <ul className="space-y-2">
+                                    {(drill.rightItems || []).map((right) => (
+                                      <li key={right.id} className="p-2 rounded bg-stone-50 border border-stone-100 text-stone-700 font-medium">
+                                        {right.text}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between">
+                                <button
+                                  onClick={() => {
+                                    setMatchAnswers(prev => ({ ...prev, [drill.id]: {} }));
+                                    setMatchChecked(prev => ({ ...prev, [drill.id]: false }));
+                                  }}
+                                  className="text-stone-400 hover:text-stone-600 text-sm flex items-center gap-1"
+                                >
+                                  <RefreshCw size={14} /> Clear
+                                </button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => setMatchChecked(prev => ({ ...prev, [drill.id]: true }))}
+                                >
+                                  Check Answers
+                                </Button>
+                              </div>
+
+                              {matchChecked[drill.id] && (
+                                <div className="mt-2 space-y-3">
+                                  {(() => {
+                                    const answers = matchAnswers[drill.id] || {};
+                                    const map = drill.answerMap || {};
+                                    const left = drill.leftItems || [];
+                                    const attempted = left.filter(l => Boolean(answers[l.id])).length;
+                                    const correct = left.filter(l => answers[l.id] && answers[l.id] === map[l.id]).length;
+                                    const allAnswered = left.length > 0 && attempted === left.length;
+                                    const passed = allAnswered && correct === left.length;
+
+                                    return (
+                                      <div className={`p-4 rounded-lg border ${passed ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+                                        <div className="font-bold mb-1">
+                                          {passed ? 'Perfect match' : `Score: ${correct}/${left.length}`}
+                                        </div>
+                                        <div className="text-sm leading-relaxed">
+                                          {passed ? drill.correctFeedback : drill.wrongFeedback}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                         </div>
                      </div>
                   </div>

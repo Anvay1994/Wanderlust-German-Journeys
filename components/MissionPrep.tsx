@@ -15,9 +15,10 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<'intel' | 'briefing' | 'clearance'>('intel');
   
-  // Quiz State
-  const [quizSelected, setQuizSelected] = useState<number | null>(null);
-  const [quizCorrect, setQuizCorrect] = useState(false);
+  // Security Clearance State (5 questions)
+  const [clearanceIndex, setClearanceIndex] = useState(0);
+  const [clearanceSelected, setClearanceSelected] = useState<number | null>(null);
+  const [clearanceAnswers, setClearanceAnswers] = useState<Record<number, { selected: number; correct: boolean }>>({});
 
   useEffect(() => {
     const fetchBriefing = async () => {
@@ -33,17 +34,42 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
     fetchBriefing();
   }, [module]);
 
+  useEffect(() => {
+    setClearanceIndex(0);
+    setClearanceSelected(null);
+    setClearanceAnswers({});
+  }, [briefing?.missionGoal, module.id]);
+
   const playAudio = (text: string) => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'de-DE';
     window.speechSynthesis.speak(utterance);
   };
 
-  const handleQuizSubmit = (idx: number) => {
-    setQuizSelected(idx);
-    if (briefing && idx === briefing.quiz.correctAnswer) {
-      setQuizCorrect(true);
+  const getClearanceQuestions = () => {
+    const questions = briefing?.securityClearance;
+    if (Array.isArray(questions) && questions.length >= 5) return questions.slice(0, 5);
+    if (briefing?.quiz) {
+      return [
+        { ...briefing.quiz, explanation: "Fallback question. Configure the AI key to generate full clearance." },
+        { ...briefing.quiz, explanation: "Fallback question. Configure the AI key to generate full clearance." },
+        { ...briefing.quiz, explanation: "Fallback question. Configure the AI key to generate full clearance." },
+        { ...briefing.quiz, explanation: "Fallback question. Configure the AI key to generate full clearance." },
+        { ...briefing.quiz, explanation: "Fallback question. Configure the AI key to generate full clearance." }
+      ];
     }
+    return [];
+  };
+
+  const handleClearanceAnswer = (idx: number, correctAnswer: number) => {
+    setClearanceSelected(idx);
+    setClearanceAnswers((prev) => ({
+      ...prev,
+      [clearanceIndex]: {
+        selected: idx,
+        correct: idx === correctAnswer
+      }
+    }));
   };
 
   if (loading) {
@@ -262,28 +288,54 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                 </div>
               )}
 
-              {/* STEP 3: CLEARANCE (Quiz) */}
-              {step === 'clearance' && briefing.quiz && (
+              {/* STEP 3: CLEARANCE (5 Questions) */}
+              {step === 'clearance' && (
                 <div className="animate-fade-in w-full max-w-2xl mx-auto">
+                   {(() => {
+                     const questions = getClearanceQuestions();
+                     if (questions.length === 0) {
+                       return (
+                         <div className="bg-white p-8 rounded-lg shadow-lg border-2 border-stone-200">
+                           <h3 className="text-2xl font-display font-bold text-stone-800 mb-2">Security Clearance</h3>
+                           <p className="text-stone-500">No clearance questions available. Please try again later.</p>
+                           <div className="mt-6">
+                             <Button variant="ghost" onClick={() => setStep('briefing')}>Back</Button>
+                           </div>
+                         </div>
+                       );
+                     }
+
+                     const current = questions[Math.min(clearanceIndex, questions.length - 1)];
+                     const answeredCount = Object.keys(clearanceAnswers).length;
+                     const correctCount = Object.values(clearanceAnswers).filter(a => a.correct).length;
+                     const finished = answeredCount >= questions.length;
+                     const passMark = 4; // 4/5 to pass
+                     const passed = finished && correctCount >= passMark;
+
+                     return (
+                       <>
                    <div className="text-center mb-8">
                       <div className="w-16 h-16 bg-stone-200 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-500">
-                         {quizCorrect ? <CheckCircle size={32} className="text-[#059669]" /> : <Lock size={32} />}
+                         {passed ? <CheckCircle size={32} className="text-[#059669]" /> : <Lock size={32} />}
                       </div>
                       <h3 className="text-2xl font-display font-bold text-stone-800">Security Clearance</h3>
                       <p className="text-stone-500">Verify your understanding to unlock the mission.</p>
+                      <div className="mt-4 text-xs font-bold uppercase tracking-widest text-stone-400">
+                        Question {Math.min(clearanceIndex + 1, questions.length)} of {questions.length}
+                      </div>
                    </div>
 
                    <div className="bg-white p-8 rounded-lg shadow-lg border-2 border-stone-200 mb-6 relative">
-                      <h4 className="text-xl font-bold text-stone-800 mb-6">{briefing.quiz?.question}</h4>
+                      <h4 className="text-xl font-bold text-stone-800 mb-6">{current.question}</h4>
                       <div className="space-y-3">
-                        {briefing.quiz?.options.map((opt, i) => (
+                        {(current.options || []).map((opt, i) => (
                            <button
                              key={i}
-                             onClick={() => !quizCorrect && handleQuizSubmit(i)}
-                             disabled={quizCorrect}
+                             onClick={() => !finished && typeof clearanceSelected !== 'number' && handleClearanceAnswer(i, current.correctAnswer)}
+                             disabled={finished || typeof clearanceSelected === 'number'}
                              className={`w-full p-4 rounded-lg text-left font-bold border-2 transition-all text-lg
-                               ${quizSelected === i 
-                                  ? (quizCorrect && i === briefing.quiz.correctAnswer 
+                               ${clearanceSelected === i 
+                                  ? (clearanceSelected === current.correctAnswer 
                                      ? 'bg-green-100 border-green-500 text-green-700' 
                                      : 'bg-red-100 border-red-500 text-red-700')
                                   : 'border-stone-200 hover:border-stone-400 bg-stone-50 text-stone-800'
@@ -295,10 +347,30 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                         ))}
                       </div>
                       
-                      {quizSelected !== null && !quizCorrect && (
-                         <div className="mt-4 text-red-500 text-center font-bold animate-pulse">
-                            Access Denied. Review intel and try again.
-                         </div>
+                      {typeof clearanceSelected === 'number' && (
+                        <div className={`mt-4 text-center font-bold ${clearanceSelected === current.correctAnswer ? 'text-[#059669]' : 'text-red-500'}`}>
+                          {clearanceSelected === current.correctAnswer ? 'Access Granted.' : 'Access Denied.'}
+                        </div>
+                      )}
+
+                      {typeof clearanceSelected === 'number' && current.explanation && (
+                        <div className="mt-4 bg-stone-50 border border-stone-200 rounded-lg p-4 text-sm text-stone-700">
+                          <span className="font-bold text-stone-800">Why:</span> {current.explanation}
+                        </div>
+                      )}
+
+                      {typeof clearanceSelected === 'number' && !finished && (
+                        <div className="mt-6 flex justify-end">
+                          <Button
+                            variant="secondary"
+                            onClick={() => {
+                              setClearanceSelected(null);
+                              setClearanceIndex((i) => Math.min(i + 1, questions.length - 1));
+                            }}
+                          >
+                            Next Question <ArrowRight size={16} />
+                          </Button>
+                        </div>
                       )}
                    </div>
 
@@ -307,12 +379,30 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
                      <Button 
                        variant="primary" 
                        onClick={onStart} 
-                       disabled={!quizCorrect}
+                       disabled={!passed}
                        className="flex-[2] py-4 text-lg shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                      >
-                       {quizCorrect ? "START MISSION" : "AUTHORIZATION PENDING"}
+                       {passed ? "START MISSION" : finished ? `SCORE ${correctCount}/${questions.length} (Need ${passMark})` : "AUTHORIZATION PENDING"}
                      </Button>
                    </div>
+
+                    {finished && !passed && (
+                      <div className="mt-4 text-center">
+                        <button
+                          onClick={() => {
+                            setClearanceIndex(0);
+                            setClearanceSelected(null);
+                            setClearanceAnswers({});
+                          }}
+                          className="text-sm font-bold text-stone-500 hover:text-stone-800"
+                        >
+                          Retry Clearance
+                        </button>
+                      </div>
+                    )}
+                       </>
+                     );
+                   })()}
                 </div>
               )}
             </>
