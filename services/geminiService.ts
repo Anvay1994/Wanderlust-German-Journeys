@@ -1,10 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CurriculumModule, UserProfile, GermanLevel, SuggestedResponse, MissionBriefing, ChatMessage, PerformanceReview, PracticeDrill } from "../types";
 
-// Use Vite environment variable for the Gemini API key
-const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
-
-const ai = new GoogleGenAI({ apiKey });
+const getAiClient = () => {
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  if (!apiKey) {
+    throw new Error("Missing VITE_GEMINI_API_KEY. Set it in your .env (local) or Vercel Environment Variables.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export interface MissionResponse {
   narrative: string;
@@ -76,6 +79,7 @@ export const generateMissionBriefing = async (
   module: CurriculumModule
 ): Promise<MissionBriefing> => {
   const model = "gemini-2.5-flash"; // Supports Thinking Config
+  const ai = getAiClient();
   const prompt = `
     Create a COMPREHENSIVE educational dossier for a German learner.
     This is the "Mission Prep" phase. It MUST be detailed and complete.
@@ -228,6 +232,7 @@ export const generateMissionStart = async (
   user: UserProfile
 ): Promise<MissionResponse> => {
   const model = "gemini-2.5-flash";
+  const ai = getAiClient();
   
   const systemPrompt = `
     You are a friendly, knowledgeable Local Guide in Germany.
@@ -280,6 +285,7 @@ export const processTurn = async (
   currentObjectives: string[]
 ): Promise<MissionResponse> => {
   const model = "gemini-2.5-flash";
+  const ai = getAiClient();
 
   const conversationHistory = history.map(msg => 
     `${msg.role === 'user' ? 'Traveler' : 'Local Guide'}: ${msg.content}`
@@ -331,6 +337,7 @@ export const processTurn = async (
 
 export const generatePracticeDrills = async (level: GermanLevel, topic?: string): Promise<PracticeDrill[]> => {
   const model = "gemini-2.5-flash";
+  const ai = getAiClient();
   const prompt = `
     Generate 5 German sentence formation challenges (Drills) for a student at level ${level}.
     ${topic ? `Focus specifically on the grammar topic: "${topic}".` : "Cover various grammar topics appropriate for this level."}
@@ -377,6 +384,7 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
 
 export const generateGrammarLesson = async (level: string, topic: string): Promise<GrammarLesson> => {
   const model = "gemini-2.5-flash";
+  const ai = getAiClient();
   const prompt = `
     Create a detailed Grammar Lesson for German learners.
     Level: ${level}
