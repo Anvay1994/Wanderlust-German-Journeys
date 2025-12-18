@@ -90,6 +90,16 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
       document.body.appendChild(script);
     });
 
+  const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit, timeoutMs: number) => {
+    const controller = new AbortController();
+    const id = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      window.clearTimeout(id);
+    }
+  };
+
   const handleCheckout = async () => {
     if (!selectedLevel) return;
     setProcessing(true);
@@ -104,17 +114,21 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
     }
 
     try {
-      const orderResponse = await fetch('/api/razorpay/create-order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`
+      const orderResponse = await fetchWithTimeout(
+        '/api/razorpay/create-order',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            level: selectedLevel,
+            tokensRedeemed: tokensToUse
+          })
         },
-        body: JSON.stringify({
-          level: selectedLevel,
-          tokensRedeemed: tokensToUse
-        })
-      });
+        20000
+      );
 
       const orderContentType = orderResponse.headers.get('content-type') || '';
       const orderData = orderContentType.includes('application/json')
@@ -147,24 +161,31 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
           color: '#059669'
         },
         modal: {
-          ondismiss: () => setProcessing(false)
+          ondismiss: () => {
+            setProcessing(false);
+            setPaymentError('Payment cancelled.');
+          }
         },
         handler: async (response: any) => {
           try {
             setProcessing(true);
-            const verifyResponse = await fetch('/api/razorpay/verify-payment', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${accessToken}`
+            const verifyResponse = await fetchWithTimeout(
+              '/api/razorpay/verify-payment',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({
+                  orderId: response.razorpay_order_id,
+                  paymentId: response.razorpay_payment_id,
+                  signature: response.razorpay_signature,
+                  level: selectedLevel
+                })
               },
-              body: JSON.stringify({
-                orderId: response.razorpay_order_id,
-                paymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-                level: selectedLevel
-              })
-            });
+              20000
+            );
 
             const verifyContentType = verifyResponse.headers.get('content-type') || '';
             const verifyData = verifyContentType.includes('application/json')
@@ -195,7 +216,8 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
       razorpay.open();
       setProcessing(false);
     } catch (error) {
-      setPaymentError('Payment setup failed. Please try again.');
+      const name = (error as any)?.name;
+      setPaymentError(name === 'AbortError' ? 'Payment request timed out. Please try again.' : 'Payment setup failed. Please try again.');
       setProcessing(false);
     } finally {
       // Keep processing state managed by Razorpay callbacks.

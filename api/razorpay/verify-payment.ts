@@ -125,6 +125,32 @@ export default async function handler(req: any, res: any) {
       res.status(500).json({ error: 'Server auth encoding failed' });
       return;
     }
+
+    const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Basic ${authHeader}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const paymentData = await paymentResponse.json().catch(() => ({}));
+    if (!paymentResponse.ok) {
+      res.status(502).json({ error: paymentData?.error?.description || 'Failed to fetch payment' });
+      return;
+    }
+    if (paymentData?.order_id !== orderId) {
+      res.status(400).json({ error: 'Payment does not match order' });
+      return;
+    }
+    if (paymentData?.status !== 'captured') {
+      res.status(400).json({ error: `Payment not captured (${paymentData?.status || 'unknown'})` });
+      return;
+    }
+    if (paymentData?.currency && paymentData.currency !== 'INR') {
+      res.status(400).json({ error: 'Invalid payment currency' });
+      return;
+    }
     const orderResponse = await fetch(`https://api.razorpay.com/v1/orders/${orderId}`, {
       method: 'GET',
       headers: {
@@ -144,11 +170,25 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const basePrice = PRICE_BY_LEVEL[level];
+    const orderLevel = typeof orderData?.notes?.level === 'string' ? orderData.notes.level : level;
+    if (!PRICE_BY_LEVEL[orderLevel]) {
+      res.status(400).json({ error: 'Invalid order level' });
+      return;
+    }
+
+    const basePrice = PRICE_BY_LEVEL[orderLevel];
     const amountInr = Number(orderData.amount) / 100;
     const tokensFromOrder = Math.max(0, Math.round(basePrice - amountInr));
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const description = `LEVEL_${orderLevel} | Razorpay ${paymentId}`;
+
+    const { data: existingTxn } = await supabaseAdmin
+      .from('transactions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('description', description)
+      .maybeSingle();
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('credits, streak_count, owned_levels')
@@ -168,8 +208,18 @@ export default async function handler(req: any, res: any) {
       Number(profile.streak_count) || 0
     );
 
-    const updatedOwned = ownedLevels.includes(level) ? ownedLevels : [...ownedLevels, level];
+    const updatedOwned = ownedLevels.includes(orderLevel) ? ownedLevels : [...ownedLevels, orderLevel];
     const updatedCredits = Math.max(0, (Number(profile.credits) || 0) - safeTokens);
+
+    if (existingTxn) {
+      res.status(200).json({
+        success: true,
+        credits: updatedCredits,
+        ownedLevels: updatedOwned,
+        transactionId: paymentId
+      });
+      return;
+    }
 
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
@@ -189,7 +239,7 @@ export default async function handler(req: any, res: any) {
       .from('transactions')
       .insert({
         user_id: userId,
-        description: `LEVEL_${level} | Razorpay ${paymentId}`,
+        description,
         amount_inr: amountInr,
         amount_credits: safeTokens
       });
