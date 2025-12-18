@@ -35,6 +35,7 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
   // Drill State
   const [drills, setDrills] = useState<PracticeDrill[]>([]);
   const [loadingDrills, setLoadingDrills] = useState(false);
+  const [drillError, setDrillError] = useState<string | null>(null);
   const [mcqAnswers, setMcqAnswers] = useState<Record<string, number>>({});
   const [matchAnswers, setMatchAnswers] = useState<Record<string, Record<string, string>>>({});
   const [matchChecked, setMatchChecked] = useState<Record<string, boolean>>({});
@@ -53,14 +54,19 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
   const handleGenerateDrills = async () => {
     setLoadingDrills(true);
     setDrills([]);
+    setDrillError(null);
     try {
       const newDrills = await generatePracticeDrills(level);
+      if (!Array.isArray(newDrills) || newDrills.length === 0) {
+        setDrillError("Couldn't generate a workout right now. Please try again.");
+      }
       setDrills(newDrills);
       setMcqAnswers({});
       setMatchAnswers({});
       setMatchChecked({});
     } catch (error) {
       console.error("Failed to generate drills", error);
+      setDrillError("Couldn't generate a workout right now. Please try again.");
     } finally {
       setLoadingDrills(false);
     }
@@ -614,7 +620,10 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
                         <Dumbbell size={32} />
                      </div>
                      <h3 className="text-xl font-bold text-stone-800 mb-2">Ready for a workout?</h3>
-                     <p className="text-stone-500 mb-6 max-w-md">Generate a personalized set of 5 sentence challenges specifically for Level {level}.</p>
+                     <p className="text-stone-500 mb-6 max-w-md">Generate a personalized set of 5 challenges specifically for Level {level}.</p>
+                     {drillError && (
+                       <div className="mb-4 text-sm text-red-600 font-bold">{drillError}</div>
+                     )}
                      <Button onClick={handleGenerateDrills} size="lg">
                         <Play size={18} fill="currentColor" /> Generate New Workout
                      </Button>

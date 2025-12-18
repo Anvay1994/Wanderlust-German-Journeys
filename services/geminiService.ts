@@ -354,6 +354,77 @@ export const processTurn = async (
 };
 
 export const generatePracticeDrills = async (level: GermanLevel, topic?: string): Promise<PracticeDrill[]> => {
+  const fallbackDrills: PracticeDrill[] = [
+    {
+      id: 'mcq-1',
+      level,
+      category: 'Basics',
+      type: 'mcq',
+      prompt: 'Choose the correct German sentence.',
+      question: 'How do you say: "I am from India."',
+      options: ['Ich bist aus Indien.', 'Ich bin aus Indien.', 'Ich ist aus Indien.', 'Ich sind aus Indien.'],
+      correctIndex: 1,
+      correctFeedback: 'Correct. "Ich" goes with "bin".',
+      wrongFeedback: 'Check the verb form of "sein" for "ich": it is "bin".'
+    },
+    {
+      id: 'mcq-2',
+      level,
+      category: 'Word Order',
+      type: 'mcq',
+      prompt: 'Pick the correct word order (main clause).',
+      question: 'Which is correct?',
+      options: ['Heute ich gehe zur Schule.', 'Heute gehe ich zur Schule.', 'Heute ich zur Schule gehe.', 'Ich heute gehe zur Schule.'],
+      correctIndex: 1,
+      correctFeedback: 'Correct. In a main clause, the conjugated verb is position 2.',
+      wrongFeedback: 'Remember: verb in position 2 (main clause).'
+    },
+    {
+      id: 'match-1',
+      level,
+      category: 'Pronouns',
+      type: 'match',
+      prompt: 'Match the pronoun to its English meaning.',
+      leftItems: [
+        { id: 'l1', text: 'ich' },
+        { id: 'l2', text: 'du' },
+        { id: 'l3', text: 'wir' }
+      ],
+      rightItems: [
+        { id: 'r2', text: 'you (informal)' },
+        { id: 'r3', text: 'we' },
+        { id: 'r1', text: 'I' }
+      ],
+      answerMap: { l1: 'r1', l2: 'r2', l3: 'r3' },
+      correctFeedback: 'Perfect. Pronouns are the building blocks of sentences.',
+      wrongFeedback: 'Review the personal pronouns: ich=I, du=you (informal), wir=we.'
+    },
+    {
+      id: 'mcq-3',
+      level,
+      category: 'Articles',
+      type: 'mcq',
+      prompt: 'Choose the correct article.',
+      question: 'Which is correct?',
+      options: ['der Frau', 'die Frau', 'das Frau', 'ein Frau'],
+      correctIndex: 1,
+      correctFeedback: 'Correct. "Frau" is feminine: "die Frau".',
+      wrongFeedback: 'Remember: "Frau" is feminine → "die Frau".'
+    },
+    {
+      id: 'mcq-4',
+      level,
+      category: 'Negation',
+      type: 'mcq',
+      prompt: 'Choose the correct negation.',
+      question: 'How do you say: "I have no car."',
+      options: ['Ich habe nicht Auto.', 'Ich habe kein Auto.', 'Ich nicht habe Auto.', 'Ich habe keine Auto.'],
+      correctIndex: 1,
+      correctFeedback: 'Correct. Use "kein" to negate a noun.',
+      wrongFeedback: 'Use "kein" to negate a noun with no article: "kein Auto".'
+    }
+  ];
+
   const model = "gemini-2.5-flash";
   const ai = getAiClient();
   const prompt = `
@@ -443,10 +514,11 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
         }
     });
     const drills = JSON.parse(response.text || "[]");
-    return Array.isArray(drills) ? drills : [];
+    if (!Array.isArray(drills) || drills.length === 0) return fallbackDrills;
+    return drills;
   } catch (e) {
       console.error(e);
-      return [];
+      return fallbackDrills;
   }
 };
 
