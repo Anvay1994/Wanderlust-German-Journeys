@@ -27,7 +27,7 @@ To make the app “private” for beta testers (especially on the Vercel free pl
 
 1. Vercel Dashboard → your project → **Settings** → **Environment Variables**
 2. Add:
-   - `APP_ACCESS_CODE` = `KOLHATKAR2025`
+   - `APP_ACCESS_CODE` = `YOUR_PRIVATE_CODE`
 3. Add it for **Production** (and **Preview** if you share preview links).
 4. Trigger a new deployment (or wait for the next git push).
 

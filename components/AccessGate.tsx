@@ -89,7 +89,7 @@ const AccessGate: React.FC<Props> = ({ onUnlocked }) => {
                 if (e.key === 'Enter' && canSubmit) handleSubmit();
               }}
               className="w-full pl-10 pr-3 py-3 rounded-md border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-              placeholder="e.g. KOLHATKAR2025"
+              placeholder="e.g. BETA2025"
               autoFocus
             />
           </div>
@@ -126,4 +126,3 @@ const AccessGate: React.FC<Props> = ({ onUnlocked }) => {
 };
 
 export default AccessGate;
-
