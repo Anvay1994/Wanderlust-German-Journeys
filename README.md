@@ -18,3 +18,29 @@ View your app in AI Studio: https://ai.studio/apps/drive/1_xhTNuGy_JDH2pMi4SV6fk
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Payments (Razorpay) + Webhook (Recommended)
+
+This app uses Vercel Serverless Functions under `api/razorpay/*` to create orders, verify payments, and receive Razorpay webhooks.
+
+### Prevent duplicate transactions in Supabase (IMPORTANT)
+
+Razorpay may deliver webhooks more than once. To ensure your database never stores duplicate purchase rows (and to avoid accidental double credit deductions in edge cases), add a unique index in Supabase.
+
+1. Supabase Dashboard → SQL Editor → New query
+2. Run this (safe, copy/paste):
+
+```sql
+-- 1) Remove existing duplicates (keeps the earliest by created_at)
+delete from public.transactions t
+using (
+  select id,
+         row_number() over (partition by user_id, description order by created_at asc, id asc) as rn
+  from public.transactions
+) d
+where t.id = d.id and d.rn > 1;
+
+-- 2) Prevent duplicates going forward (same user + same payment description)
+create unique index if not exists transactions_user_description_unique
+on public.transactions (user_id, description);
+```
