@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import { PRICE_BY_LEVEL, sanitizeTokens } from './pricing';
 
 const getRequiredEnv = (name: string) => {
@@ -43,6 +42,8 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    const { createClient } = await import('@supabase/supabase-js');
+
     const token = getAuthToken(req);
     if (!token) {
       res.status(401).json({ error: 'Missing auth token' });
@@ -101,7 +102,10 @@ export default async function handler(req: any, res: any) {
 
     const razorpayKeyId = getRequiredEnv('RAZORPAY_KEY_ID');
     const razorpayKeySecret = getRequiredEnv('RAZORPAY_KEY_SECRET');
-    const authHeader = Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString('base64');
+    const authHeader =
+      typeof Buffer !== 'undefined'
+        ? Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString('base64')
+        : (globalThis as any).btoa?.(`${razorpayKeyId}:${razorpayKeySecret}`);
 
     const orderResponse = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
