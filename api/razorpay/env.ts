@@ -8,9 +8,9 @@ export default function handler(_req: any, res: any) {
       VITE_SUPABASE_ANON_KEY: env('VITE_SUPABASE_ANON_KEY'),
       SUPABASE_SERVICE_ROLE_KEY: env('SUPABASE_SERVICE_ROLE_KEY'),
       RAZORPAY_KEY_ID: env('RAZORPAY_KEY_ID'),
-      RAZORPAY_KEY_SECRET: env('RAZORPAY_KEY_SECRET')
+      RAZORPAY_KEY_SECRET: env('RAZORPAY_KEY_SECRET'),
+      RAZORPAY_WEBHOOK_SECRET: env('RAZORPAY_WEBHOOK_SECRET')
     },
     ts: new Date().toISOString()
   });
 }
-
