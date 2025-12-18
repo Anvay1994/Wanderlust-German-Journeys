@@ -59,21 +59,25 @@ const verifySignature = (orderId: string, paymentId: string, signature: string, 
 };
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
   try {
+    try {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    } catch {
+      // ignore
+    }
+
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
     const { createClient } = await import('@supabase/supabase-js');
 
     const token = getAuthToken(req);
@@ -117,6 +121,10 @@ export default async function handler(req: any, res: any) {
       typeof Buffer !== 'undefined'
         ? Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString('base64')
         : (globalThis as any).btoa?.(`${razorpayKeyId}:${razorpayKeySecret}`);
+    if (!authHeader) {
+      res.status(500).json({ error: 'Server auth encoding failed' });
+      return;
+    }
     const orderResponse = await fetch(`https://api.razorpay.com/v1/orders/${orderId}`, {
       method: 'GET',
       headers: {
@@ -198,6 +206,16 @@ export default async function handler(req: any, res: any) {
       transactionId: paymentId
     });
   } catch (error: any) {
-    res.status(500).json({ error: error?.message || 'Server error' });
+    try {
+      res.status(500).json({
+        error: error?.message || 'Server error',
+        details: {
+          name: error?.name,
+          cause: error?.cause ? String(error.cause) : undefined
+        }
+      });
+    } catch {
+      throw error;
+    }
   }
 }
