@@ -19,6 +19,23 @@ View your app in AI Studio: https://ai.studio/apps/drive/1_xhTNuGy_JDH2pMi4SV6fk
 3. Run the app:
    `npm run dev`
 
+## Private Testing (Access Code Gate)
+
+To make the app “private” for beta testers (especially on the Vercel free plan), the UI is protected by an access-code screen.
+
+### Configure on Vercel
+
+1. Vercel Dashboard → your project → **Settings** → **Environment Variables**
+2. Add:
+   - `APP_ACCESS_CODE` = `KOLHATKAR2025`
+3. Add it for **Production** (and **Preview** if you share preview links).
+4. Trigger a new deployment (or wait for the next git push).
+
+### Share with testers
+
+- Share your Vercel URL + the access code.
+- Testers enter the code once per browser/device (it is remembered locally).
+
 ## Payments (Razorpay) + Webhook (Recommended)
 
 This app uses Vercel Serverless Functions under `api/razorpay/*` to create orders, verify payments, and receive Razorpay webhooks.

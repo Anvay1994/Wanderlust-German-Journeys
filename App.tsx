@@ -9,10 +9,15 @@ import Guidebook from './components/Guidebook';
 import Analytics from './components/Analytics';
 import LearningStrategy from './components/LearningStrategy';
 import AdminConsole from './components/AdminConsole';
+import AccessGate, { hasLocalAccess } from './components/AccessGate';
 import { Loader2 } from 'lucide-react';
 import { supabase, mapProfileToUser, updateUserProfile } from './services/supabaseClient';
 
 const App: React.FC = () => {
+  const [accessUnlocked, setAccessUnlocked] = useState(() => {
+    if (import.meta.env.DEV) return true;
+    return hasLocalAccess();
+  });
   const [appState, setAppState] = useState<AppState>(AppState.ONBOARDING);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -24,6 +29,8 @@ const App: React.FC = () => {
 
   // SUPABASE AUTH INITIALIZATION
   useEffect(() => {
+    if (!accessUnlocked) return;
+
     const initSession = async () => {
       // 1. Check active session
       const { data: { session } } = await supabase.auth.getSession();
@@ -53,7 +60,7 @@ const App: React.FC = () => {
     };
 
     initSession();
-  }, []);
+  }, [accessUnlocked]);
 
   const fetchUserProfile = async (uid: string) => {
     try {
@@ -188,19 +195,23 @@ const App: React.FC = () => {
          unlockedModules: ['A1.1', 'A1.2', 'A1.3', 'A1.4', 'A1.5', 'A1.6'],
          ownedLevels: []
        };
-    }
-    
-    setUser(updatedUser);
-    if (userId) {
-      await updateUserProfile(userId, updatedUser);
-    }
-  };
+	    }
+	    
+	    setUser(updatedUser);
+	    if (userId) {
+	      await updateUserProfile(userId, updatedUser);
+	    }
+	  };
 
-  if (isLoading) {
-    return (
-      <div className="h-screen w-screen bg-[#f5f5f4] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-[#059669] animate-spin" />
-      </div>
+	  if (!accessUnlocked) {
+	    return <AccessGate onUnlocked={() => setAccessUnlocked(true)} />;
+	  }
+
+	  if (isLoading) {
+	    return (
+	      <div className="h-screen w-screen bg-[#f5f5f4] flex items-center justify-center">
+	        <Loader2 className="w-10 h-10 text-[#059669] animate-spin" />
+	      </div>
     );
   }
 
