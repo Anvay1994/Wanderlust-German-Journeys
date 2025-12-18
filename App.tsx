@@ -10,6 +10,7 @@ import Analytics from './components/Analytics';
 import LearningStrategy from './components/LearningStrategy';
 import AdminConsole from './components/AdminConsole';
 import AccessGate, { hasLocalAccess } from './components/AccessGate';
+import BugReportButton from './components/BugReportButton';
 import { Loader2 } from 'lucide-react';
 import { supabase, mapProfileToUser, updateUserProfile } from './services/supabaseClient';
 
@@ -217,6 +218,11 @@ const App: React.FC = () => {
 
   return (
     <div className="font-sans text-stone-900">
+      <BugReportButton
+        appState={appState}
+        userId={userId}
+        userLevel={user?.level}
+      />
       {appState === AppState.ONBOARDING && (
         <Onboarding 
           onComplete={handleOnboardingComplete} 
