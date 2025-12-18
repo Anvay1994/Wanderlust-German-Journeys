@@ -1,4 +1,29 @@
-import { PRICE_BY_LEVEL, sanitizeTokens } from './pricing';
+const PRICE_BY_LEVEL: Record<string, number> = {
+  A1: 1499,
+  A2: 2999,
+  B1: 2999,
+  B2: 2999,
+  C1: 2999,
+  C2: 2999
+};
+
+const getDiscountLimit = (streak: number) => {
+  if (streak >= 30) return 0.3;
+  if (streak >= 7) return 0.25;
+  return 0.2;
+};
+
+const getMaxUsableTokens = (credits: number, basePrice: number, streak: number) => {
+  const maxDiscountAmount = basePrice * getDiscountLimit(streak);
+  const maxTokensForDiscount = Math.floor(maxDiscountAmount);
+  return Math.min(credits, maxTokensForDiscount);
+};
+
+const sanitizeTokens = (requestedTokens: number, credits: number, basePrice: number, streak: number) => {
+  if (!Number.isFinite(requestedTokens) || requestedTokens < 0) return 0;
+  const maxTokens = getMaxUsableTokens(credits, basePrice, streak);
+  return Math.min(Math.floor(requestedTokens), maxTokens);
+};
 
 const getRequiredEnv = (name: string) => {
   const value = process.env[name];
@@ -51,7 +76,7 @@ export default async function handler(req: any, res: any) {
     }
 
     const { level, tokensRedeemed } = parseBody(req);
-    if (!level || !PRICE_BY_LEVEL[level]) {
+    if (!level || typeof level !== 'string' || !PRICE_BY_LEVEL[level]) {
       res.status(400).json({ error: 'Invalid level' });
       return;
     }
