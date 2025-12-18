@@ -116,7 +116,10 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
         })
       });
 
-      const orderData = await orderResponse.json().catch(() => ({}));
+      const orderContentType = orderResponse.headers.get('content-type') || '';
+      const orderData = orderContentType.includes('application/json')
+        ? await orderResponse.json().catch(() => ({}))
+        : { error: (await orderResponse.text().catch(() => 'Unable to start payment.')).slice(0, 200) };
       if (!orderResponse.ok) {
         setPaymentError(orderData.error || 'Unable to start payment.');
         setProcessing(false);
@@ -163,7 +166,10 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
               })
             });
 
-            const verifyData = await verifyResponse.json().catch(() => ({}));
+            const verifyContentType = verifyResponse.headers.get('content-type') || '';
+            const verifyData = verifyContentType.includes('application/json')
+              ? await verifyResponse.json().catch(() => ({}))
+              : { error: (await verifyResponse.text().catch(() => 'Payment verification failed.')).slice(0, 200) };
             if (!verifyResponse.ok || !verifyData.success) {
               setPaymentError(verifyData.error || 'Payment verification failed.');
               setProcessing(false);
