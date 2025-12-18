@@ -96,7 +96,8 @@ export default async function handler(req: any, res: any) {
     const orderId: string | undefined = payment?.order_id || order?.id;
     const paymentStatus: string | undefined = payment?.status;
 
-    const isCaptureEvent = event === 'payment.captured' || event === 'order.paid';
+    // Only process one webhook type to avoid duplicate handling (Razorpay can send multiple related events).
+    const isCaptureEvent = event === 'payment.captured';
     if (!isCaptureEvent) {
       res.status(200).json({ received: true, ignored: true });
       return;
@@ -146,14 +147,14 @@ export default async function handler(req: any, res: any) {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const description = `LEVEL_${level} | Razorpay ${paymentId}`;
-    const { data: existingTxn } = await supabaseAdmin
+    const { data: existingTxnRows } = await supabaseAdmin
       .from('transactions')
       .select('id')
       .eq('user_id', userId)
       .eq('description', description)
-      .maybeSingle();
+      .limit(1);
 
-    if (existingTxn) {
+    if ((existingTxnRows || []).length > 0) {
       res.status(200).json({ received: true, duplicate: true });
       return;
     }
@@ -177,8 +178,9 @@ export default async function handler(req: any, res: any) {
       Number(profile.streak_count) || 0
     );
 
+    const creditsToDeduct = ownedLevels.includes(level) ? 0 : safeTokens;
     const updatedOwned = ownedLevels.includes(level) ? ownedLevels : [...ownedLevels, level];
-    const updatedCredits = Math.max(0, (Number(profile.credits) || 0) - safeTokens);
+    const updatedCredits = Math.max(0, (Number(profile.credits) || 0) - creditsToDeduct);
 
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
@@ -200,7 +202,7 @@ export default async function handler(req: any, res: any) {
         user_id: userId,
         description,
         amount_inr: amountInr,
-        amount_credits: safeTokens
+        amount_credits: creditsToDeduct
       });
 
     if (insertError) {
@@ -213,4 +215,3 @@ export default async function handler(req: any, res: any) {
     res.status(200).json({ received: true, ok: false, error: error?.message || 'Server error' });
   }
 }
-

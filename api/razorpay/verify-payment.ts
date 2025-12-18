@@ -183,12 +183,12 @@ export default async function handler(req: any, res: any) {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     const description = `LEVEL_${orderLevel} | Razorpay ${paymentId}`;
 
-    const { data: existingTxn } = await supabaseAdmin
+    const { data: existingTxnRows } = await supabaseAdmin
       .from('transactions')
       .select('id')
       .eq('user_id', userId)
       .eq('description', description)
-      .maybeSingle();
+      .limit(1);
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('credits, streak_count, owned_levels')
@@ -209,9 +209,10 @@ export default async function handler(req: any, res: any) {
     );
 
     const updatedOwned = ownedLevels.includes(orderLevel) ? ownedLevels : [...ownedLevels, orderLevel];
-    const updatedCredits = Math.max(0, (Number(profile.credits) || 0) - safeTokens);
+    const creditsToDeduct = ownedLevels.includes(orderLevel) ? 0 : safeTokens;
+    const updatedCredits = Math.max(0, (Number(profile.credits) || 0) - creditsToDeduct);
 
-    if (existingTxn) {
+    if ((existingTxnRows || []).length > 0) {
       res.status(200).json({
         success: true,
         credits: updatedCredits,
@@ -241,7 +242,7 @@ export default async function handler(req: any, res: any) {
         user_id: userId,
         description,
         amount_inr: amountInr,
-        amount_credits: safeTokens
+        amount_credits: creditsToDeduct
       });
 
     if (insertError) {
