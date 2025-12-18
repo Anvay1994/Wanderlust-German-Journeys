@@ -187,6 +187,7 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
         setProcessing(false);
       });
       razorpay.open();
+      setProcessing(false);
     } catch (error) {
       setPaymentError('Payment setup failed. Please try again.');
       setProcessing(false);
