@@ -292,7 +292,7 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
                 <div className="flex-1 relative z-10">
                    <h3 className="font-bold text-lg text-stone-800">German Level {selectedLevel}</h3>
                    <p className="text-sm text-stone-500">
-                     {selectedLevel === GermanLevel.A1 ? 'Upgrade to Full Level' : '12 Missions • Full Access'}
+                     {selectedLevel === GermanLevel.A1 ? 'Upgrade to Full Level' : '12 Journeys • Full Access'}
                    </p>
                 </div>
                 <div className="text-right relative z-10">
@@ -478,7 +478,7 @@ const StoreModal: React.FC<StoreModalProps> = ({ onClose, onPurchaseLevel, user,
                              <div>
                                 <h3 className="font-bold text-stone-800 text-lg">Level {level}</h3>
                                 <p className="text-xs text-stone-500">
-                                   {level === GermanLevel.A1 ? '12 Missions (6 Free)' : '12 Missions • Full Access'}
+                                  {level === GermanLevel.A1 ? '12 Journeys (6 Free)' : '12 Journeys • Full Access'}
                                 </p>
                              </div>
                           </div>

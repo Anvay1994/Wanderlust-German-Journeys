@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CurriculumModule, UserProfile, GermanLevel, SuggestedResponse, MissionBriefing, ChatMessage, PerformanceReview, PracticeDrill } from "../types";
+import { applyPedagogicalGuards, generateGermanSentence, hasBlacklistedPattern, validateGermanSentence } from "./linguisticGuardrails";
 
 const getAiClient = () => {
   const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
@@ -7,6 +8,44 @@ const getAiClient = () => {
     throw new Error("Missing VITE_GEMINI_API_KEY. Set it in your .env (local) or Vercel Environment Variables.");
   }
   return new GoogleGenAI({ apiKey });
+};
+
+const sanitizeTravelCopy = (text: string) => {
+  if (!text || typeof text !== 'string') return text;
+  const replacements: Array<[RegExp, string]> = [
+    [/\bmissions\b/gi, 'journeys'],
+    [/\bmission\b/gi, 'journey'],
+    [/\bbriefing\b/gi, 'overview'],
+    [/\bintel\b/gi, 'notes'],
+    [/\bclearance\b/gi, 'check'],
+    [/\bauthorization\b/gi, 'approval'],
+    [/\bobjective\b/gi, 'goal'],
+    [/\babort\b/gi, 'change route']
+  ];
+
+  const applyCase = (match: string, replacement: string) => {
+    if (match.toUpperCase() === match) return replacement.toUpperCase();
+    if (match[0] === match[0].toUpperCase()) {
+      return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+    }
+    return replacement;
+  };
+
+  return replacements.reduce((acc, [regex, replacement]) => {
+    return acc.replace(regex, (match) => applyCase(match, replacement));
+  }, text);
+};
+
+const sanitizeArray = (items: string[]) => items.map((item) => sanitizeTravelCopy(item));
+
+const sanitizePhrasePairs = (pairs: { german: string; english: string }[], level: GermanLevel) => {
+  return pairs.map((pair) => {
+    const guarded = applyPedagogicalGuards(pair.german, level);
+    return {
+      german: guarded.sentence,
+      english: sanitizeTravelCopy(pair.english)
+    };
+  });
 };
 
 export interface MissionResponse {
@@ -75,21 +114,69 @@ const RESPONSE_SCHEMA = {
   required: ["narrative", "agentMessage", "englishTranslation", "suggestedResponses"]
 };
 
-export const generateMissionBriefing = async (
-  module: CurriculumModule
+const getFallbackPhrases = (module: CurriculumModule) => {
+  const focus = module.grammarFocus.join(' ').toLowerCase();
+  const phrases: { german: string; english: string }[] = [];
+
+  if (focus.includes('sein')) {
+    phrases.push({ german: 'Ich bin in Berlin.', english: 'I am in Berlin.' });
+  }
+  if (focus.includes('haben')) {
+    phrases.push({ german: 'Ich habe einen Pass.', english: 'I have a passport.' });
+  }
+
+  if (phrases.length === 0) {
+    phrases.push({ german: 'Ich lerne Deutsch.', english: 'I am learning German.' });
+  }
+
+  phrases.push(
+    { german: 'Können Sie mir helfen?', english: 'Can you help me?' },
+    { german: 'Ich möchte ein Ticket.', english: 'I would like a ticket.' }
+  );
+
+  return phrases.slice(0, 4);
+};
+
+const getFallbackVocabulary = () => ([
+  { german: 'der Pass', english: 'passport' },
+  { german: 'die Reise', english: 'journey' },
+  { german: 'das Ticket', english: 'ticket' },
+  { german: 'der Bahnhof', english: 'train station' }
+]);
+
+const isBriefingMalformed = (data: any) => {
+  if (!data || typeof data !== 'object') return true;
+  if (!data.lesson || (!data.lesson.title && !data.lesson.explanation)) return true;
+  const hasVocab = Array.isArray(data.vocabulary) && data.vocabulary.length > 0;
+  const hasPhrases = Array.isArray(data.keyPhrases) && data.keyPhrases.length > 0;
+  return !hasVocab && !hasPhrases;
+};
+
+const sanitizeClearance = (items: any[]) => {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => ({
+    ...item,
+    question: sanitizeTravelCopy(item.question || ''),
+    options: Array.isArray(item.options) ? item.options.map((opt: string) => sanitizeTravelCopy(opt)) : [],
+    explanation: sanitizeTravelCopy(item.explanation || '')
+  }));
+};
+
+const generateMissionBriefingInternal = async (
+  module: CurriculumModule,
+  attempt: number
 ): Promise<MissionBriefing> => {
   const model = "gemini-2.5-flash"; // Supports Thinking Config
-  const ai = getAiClient();
   const prompt = `
-    Create a COMPREHENSIVE educational dossier for a German learner.
-    This is the "Mission Prep" phase. It MUST be detailed and complete.
+    Create a COMPREHENSIVE learning guide for a German learner.
+    This is the "Journey Overview" phase. It MUST be detailed and complete.
     
     Module: ${module.title} (${module.level})
     Grammar Focus: ${module.grammarFocus.join(', ')}
     Vocab Theme: ${module.vocabularyTheme}
 
     Output JSON with:
-    1. missionGoal: A 1-sentence strategic objective (e.g. "Master the verb 'sein' to introduce yourself.").
+    1. missionGoal: A 1-sentence journey goal (use travel language, not military words).
     2. vocabulary: 8 essential words (German/English) relevant to the scenario.
     3. lesson:
        - title: The specific Grammar Rule name.
@@ -100,8 +187,8 @@ export const generateMissionBriefing = async (
        - commonMistakes: 2-3 common errors.
     4. keyPhrases: 4 useful sentences for the scenario.
     5. culturalFact: A fascinating tidbit about Germany.
-    6. strategyTip: A specific linguistic or cultural hack to succeed in this mission (e.g., "In German, always look the person in the eye when toasting.").
-    7. securityClearance: EXACTLY 5 multiple-choice questions testing the *Grammar Rule*.
+    6. strategyTip: A specific linguistic or cultural hack for travelers.
+    7. securityClearance: EXACTLY 5 multiple-choice check-in questions testing the *Grammar Rule*.
        - Each question has 4 options.
        - correctAnswer is an index 0-3.
        - Include a short explanation for why the correct option is correct.
@@ -160,6 +247,7 @@ export const generateMissionBriefing = async (
   };
 
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model,
       contents: prompt,
@@ -171,34 +259,79 @@ export const generateMissionBriefing = async (
     });
     
     const data = JSON.parse(response.text || "{}");
-    
-    // PARTIAL RECOVERY STRATEGY
+    if (attempt < 1 && isBriefingMalformed(data)) {
+      return generateMissionBriefingInternal(module, attempt + 1);
+    }
+
+    const fallbackPhrases = getFallbackPhrases(module);
+    const fallbackVocab = getFallbackVocabulary();
+
+    let example = typeof data.lesson?.example === 'string' ? data.lesson.example.trim() : '';
+    if (!example) {
+      const generated = await generateGermanSentence(
+        module.level,
+        module.grammarFocus[0] || 'basic sentence',
+        module.title,
+        'neutral'
+      );
+      example = generated.sentence || fallbackPhrases[0].german;
+    }
+
+    const guardedExample = applyPedagogicalGuards(example, module.level).sentence || fallbackPhrases[0].german;
+    const lessonTitle = sanitizeTravelCopy(data.lesson?.title || module.title);
+    const lessonExplanation = sanitizeTravelCopy(
+      data.lesson?.explanation || `Focus on ${module.grammarFocus[0]} and prepare for your journey.`
+    );
+
+    let keyPhrases = Array.isArray(data.keyPhrases) ? data.keyPhrases : [];
+    if (keyPhrases.length === 0 || keyPhrases.some((p: any) => !p?.german)) {
+      keyPhrases = fallbackPhrases;
+    }
+
+    const focus = module.grammarFocus.join(' ').toLowerCase();
+    if (focus.includes('sein') && !keyPhrases.some((p: any) => p.german?.toLowerCase().includes('ich bin'))) {
+      keyPhrases.push({ german: 'Ich bin in Berlin.', english: 'I am in Berlin.' });
+    }
+    if (focus.includes('haben') && !keyPhrases.some((p: any) => p.german?.toLowerCase().includes('ich habe'))) {
+      keyPhrases.push({ german: 'Ich habe einen Pass.', english: 'I have a passport.' });
+    }
+
+    keyPhrases = sanitizePhrasePairs(keyPhrases, module.level);
+
+    const vocabulary = Array.isArray(data.vocabulary) && data.vocabulary.length > 0
+      ? data.vocabulary
+      : fallbackVocab;
+
     const safeBriefing: MissionBriefing = {
-        missionGoal: data.missionGoal || `Master ${module.grammarFocus[0]} to complete your mission.`,
-        vocabulary: Array.isArray(data.vocabulary) ? data.vocabulary : [],
+        missionGoal: sanitizeTravelCopy(data.missionGoal || `Master ${module.grammarFocus[0]} to begin your journey.`),
+        vocabulary,
         lesson: {
-            title: data.lesson?.title || module.title,
-            explanation: data.lesson?.explanation || `Focus on ${module.grammarFocus[0]} and prepare for your mission.`,
-            keyPoints: Array.isArray(data.lesson?.keyPoints) ? data.lesson.keyPoints : ["Review the grammar table.", "Watch out for exceptions.", "Practice the example sentence."],
-            example: data.lesson?.example || "",
+            title: lessonTitle,
+            explanation: lessonExplanation,
+            keyPoints: Array.isArray(data.lesson?.keyPoints) && data.lesson.keyPoints.length > 0
+              ? sanitizeArray(data.lesson.keyPoints)
+              : ["Review the grammar table.", "Watch out for exceptions.", "Practice the example sentence."],
+            example: guardedExample,
             grammarTable: data.lesson?.grammarTable || { headers: [], rows: [] },
-            commonMistakes: Array.isArray(data.lesson?.commonMistakes) ? data.lesson.commonMistakes : []
+            commonMistakes: Array.isArray(data.lesson?.commonMistakes) ? sanitizeArray(data.lesson.commonMistakes) : []
         },
-        keyPhrases: Array.isArray(data.keyPhrases) ? data.keyPhrases : [],
-        culturalFact: data.culturalFact || "German is spoken by over 100 million people worldwide.",
-        strategyTip: data.strategyTip || "Take your time and speak clearly.",
-        quiz: data.quiz,
-        securityClearance: Array.isArray(data.securityClearance) ? data.securityClearance : []
+        keyPhrases,
+        culturalFact: sanitizeTravelCopy(data.culturalFact || "German is spoken by over 100 million people worldwide."),
+        strategyTip: sanitizeTravelCopy(data.strategyTip || "Take your time and speak clearly."),
+        quiz: data.quiz
+          ? {
+              ...data.quiz,
+              question: sanitizeTravelCopy(data.quiz.question || ''),
+              options: Array.isArray(data.quiz.options) ? data.quiz.options.map((opt: string) => sanitizeTravelCopy(opt)) : []
+            }
+          : data.quiz,
+        securityClearance: sanitizeClearance(Array.isArray(data.securityClearance) ? data.securityClearance : [])
     };
 
     if (safeBriefing.lesson.grammarTable) {
         if (!Array.isArray(safeBriefing.lesson.grammarTable.headers) || !Array.isArray(safeBriefing.lesson.grammarTable.rows)) {
             safeBriefing.lesson.grammarTable = { headers: [], rows: [] };
         }
-    }
-
-    if (safeBriefing.vocabulary.length === 0 && safeBriefing.keyPhrases.length === 0 && !data.lesson) {
-        throw new Error("Briefing data completely empty");
     }
 
     if (!Array.isArray(safeBriefing.securityClearance) || safeBriefing.securityClearance.length < 5) {
@@ -208,30 +341,37 @@ export const generateMissionBriefing = async (
           question: "Which option is correct?",
           options: ["Option A", "Option B", "Option C", "Option D"],
           correctAnswer: 0,
-          explanation: "Fallback question. Configure the AI key to generate full clearance."
+          explanation: "Fallback question. Configure the AI key to generate full check-in questions."
         }
       ].slice(0, 5);
+    }
+
+    if (safeBriefing.keyPhrases.length === 0) {
+      safeBriefing.keyPhrases = fallbackPhrases;
+    }
+    if (safeBriefing.vocabulary.length === 0) {
+      safeBriefing.vocabulary = fallbackVocab;
     }
     
     return safeBriefing;
   } catch (e) {
     console.warn("Gemini Error or Validation Failure (using fallback):", e);
-    // Hard Fallback data if API fails completely
+    const fallbackPhrases = getFallbackPhrases(module);
     return {
       missionGoal: "Master the basics of communication to navigate your arrival.",
-      vocabulary: [{ german: 'Hallo', english: 'Hello' }, { german: 'Danke', english: 'Thank you' }],
+      vocabulary: getFallbackVocabulary(),
       lesson: { 
-        title: 'Mission Basics', 
+        title: 'Journey Basics', 
         explanation: 'German verbs change their ending depending on who is speaking (conjugation). The formal "Sie" is essential for polite interactions with strangers.', 
         keyPoints: ["Verbs change based on the person.", "Formal 'Sie' is used for strangers.", "The verb is usually in position 2."],
-        example: 'Guten Tag, wie geht es Ihnen?', 
+        example: fallbackPhrases[0]?.german || 'Guten Tag, wie geht es Ihnen?', 
         commonMistakes: ['Forgetting to capitalize nouns', 'Mixing up Du and Sie'],
         grammarTable: {
           headers: ["Person", "Verb Ending"],
           rows: [["ich", "-e"], ["du", "-st"], ["er/sie/es", "-t"]]
         }
       },
-      keyPhrases: [{ german: 'Ich möchte...', english: 'I would like...' }, { german: 'Können Sie mir helfen?', english: 'Can you help me?'}],
+      keyPhrases: fallbackPhrases,
       culturalFact: 'Germany has over 20,000 castles and a rich history of folklore.',
       strategyTip: 'When in doubt, smile and use the formal "Sie". Politeness opens doors.',
       securityClearance: [
@@ -243,6 +383,12 @@ export const generateMissionBriefing = async (
       ]
     };
   }
+};
+
+export const generateMissionBriefing = async (
+  module: CurriculumModule
+): Promise<MissionBriefing> => {
+  return generateMissionBriefingInternal(module, 0);
 };
 
 export const generateMissionStart = async (
@@ -262,10 +408,10 @@ export const generateMissionStart = async (
     - A2: Use Present and simple Perfect Tense. Connectors: und, aber, oder.
     - B1+: More complex structures allowed.
     
-    Goal: Start the roleplay.
+    Goal: Start the journey scene.
     1. Set the scene in English (narrative).
     2. Initiate the dialogue in German (adhering to Level ${user.level}).
-    3. Define 3 specific objectives for the user.
+    3. Define 3 specific goals for the user (travel language, no military terms).
     4. Provide 3 Suggested Responses (Simple German sentences).
   `;
 
@@ -282,10 +428,27 @@ export const generateMissionStart = async (
 
     const data = JSON.parse(response.text || "{}");
     
-    if (!data.agentMessage) throw new Error("Incomplete mission data");
+    if (!data.agentMessage) throw new Error("Incomplete journey data");
+
+    const guardedAgent = applyPedagogicalGuards(data.agentMessage || '', module.level);
+    const suggestedResponses = Array.isArray(data.suggestedResponses)
+      ? data.suggestedResponses.map((item: SuggestedResponse) => {
+          const guarded = applyPedagogicalGuards(item.german || '', module.level);
+          return {
+            german: guarded.sentence,
+            english: sanitizeTravelCopy(item.english || '')
+          };
+        })
+      : [];
 
     return {
       ...data,
+      narrative: sanitizeTravelCopy(data.narrative || ''),
+      agentMessage: guardedAgent.sentence || data.agentMessage,
+      englishTranslation: sanitizeTravelCopy(data.englishTranslation || ''),
+      culturalNote: data.culturalNote ? sanitizeTravelCopy(data.culturalNote) : undefined,
+      objectives: Array.isArray(data.objectives) ? data.objectives.map((obj: string) => sanitizeTravelCopy(obj)) : data.objectives,
+      suggestedResponses,
       objectivesUpdate: [false, false, false], 
       missionStatus: 'active',
       xpAwarded: 0
@@ -311,7 +474,7 @@ export const processTurn = async (
 
   const prompt = `
     Roleplay Context: ${module.title} (${module.description}).
-    Current Objectives: ${JSON.stringify(currentObjectives)}.
+    Current Goals: ${JSON.stringify(currentObjectives)}.
     Module Level: ${module.level}
     
     Previous Conversation History:
@@ -324,12 +487,12 @@ export const processTurn = async (
     - STRICTLY adapt your German response to Level ${module.level}. (A1/A2 = Simple sentences, no complex sub-clauses).
     - If user grammar is bad, gently correct in 'correction' field, but accept the input if understandable.
     - Provide "Suggested Responses" that match the user's level (Simple for A1/A2).
-    - Check if ALL objectives are met. If so, set missionStatus to "completed".
+    - Check if ALL goals are met. If so, set missionStatus to "completed".
     - If missionStatus is "completed", you MUST provide a "performanceReview".
 
     Task:
     1. Evaluate the user's German input.
-    2. Check if objectives are met.
+    2. Check if goals are met.
     3. Reply as the Local Guide (Level-Appropriate).
     4. Provide 3 NEW Suggested Responses.
     5. Update missionStatus and generate review if done.
@@ -345,8 +508,55 @@ export const processTurn = async (
         temperature: 0.5 
       }
     });
+    const data = JSON.parse(response.text || "{}");
+    const guardedAgent = applyPedagogicalGuards(data.agentMessage || '', module.level);
+    const suggestedResponses = Array.isArray(data.suggestedResponses)
+      ? data.suggestedResponses.map((item: SuggestedResponse) => {
+          const guarded = applyPedagogicalGuards(item.german || '', module.level);
+          return {
+            german: guarded.sentence,
+            english: sanitizeTravelCopy(item.english || '')
+          };
+        })
+      : [];
 
-    return JSON.parse(response.text || "{}");
+    let validationResult;
+    try {
+      validationResult = await validateGermanSentence(userMessage, module.level, 'chat');
+    } catch (e) {
+      console.warn('[Guardrails] validation error:', e);
+    }
+
+    const correctionNotes: string[] = [];
+    if (data.correction) correctionNotes.push(sanitizeTravelCopy(data.correction));
+    if (validationResult && validationResult.status !== 'ACCEPT') {
+      if (validationResult.preferred_correction) {
+        correctionNotes.push(`Try: ${validationResult.preferred_correction}`);
+      }
+      if (validationResult.feedback) {
+        correctionNotes.push(validationResult.feedback);
+      }
+    }
+
+    const performanceReview = data.performanceReview
+      ? {
+          strengths: sanitizeTravelCopy(data.performanceReview.strengths || ''),
+          weaknesses: sanitizeTravelCopy(data.performanceReview.weaknesses || ''),
+          feedback: sanitizeTravelCopy(data.performanceReview.feedback || '')
+        }
+      : undefined;
+
+    return {
+      ...data,
+      narrative: sanitizeTravelCopy(data.narrative || ''),
+      agentMessage: guardedAgent.sentence || data.agentMessage,
+      englishTranslation: sanitizeTravelCopy(data.englishTranslation || ''),
+      culturalNote: data.culturalNote ? sanitizeTravelCopy(data.culturalNote) : undefined,
+      objectives: Array.isArray(data.objectives) ? data.objectives.map((obj: string) => sanitizeTravelCopy(obj)) : data.objectives,
+      suggestedResponses,
+      correction: correctionNotes.length > 0 ? correctionNotes.join(' ') : data.correction,
+      performanceReview
+    };
   } catch (error) {
     console.error("Turn processing error", error);
     throw error;
@@ -361,9 +571,9 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
       category: 'Basics',
       type: 'mcq',
       prompt: 'Choose the correct German sentence.',
-      question: 'How do you say: "I am from India."',
-      options: ['Ich bist aus Indien.', 'Ich bin aus Indien.', 'Ich ist aus Indien.', 'Ich sind aus Indien.'],
-      correctIndex: 1,
+      question: 'How do you say: "I am tired."',
+      options: ['Ich bin müde.', 'Ich bist müde.', 'Ich sind müde.', 'Ich müde bin.'],
+      correctIndex: 0,
       correctFeedback: 'Correct. "Ich" goes with "bin".',
       wrongFeedback: 'Check the verb form of "sein" for "ich": it is "bin".'
     },
@@ -426,7 +636,6 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
   ];
 
   const model = "gemini-2.5-flash";
-  const ai = getAiClient();
   const prompt = `
     Generate 5 Training Gym challenges for a German learner (CEFR ${level}).
     ${topic ? `Focus on the grammar topic: "${topic}".` : "Cover various grammar topics appropriate for this level."}
@@ -505,6 +714,7 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
   };
 
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
         model,
         contents: prompt,
@@ -515,6 +725,13 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
     });
     const drills = JSON.parse(response.text || "[]");
     if (!Array.isArray(drills) || drills.length === 0) return fallbackDrills;
+
+    const hasBlacklisted = drills.some((drill: PracticeDrill) => {
+      if (!Array.isArray(drill.options)) return false;
+      return drill.options.some((opt) => hasBlacklistedPattern(opt, level));
+    });
+    if (hasBlacklisted) return fallbackDrills;
+
     return drills;
   } catch (e) {
       console.error(e);
@@ -524,7 +741,6 @@ export const generatePracticeDrills = async (level: GermanLevel, topic?: string)
 
 export const generateGrammarLesson = async (level: string, topic: string): Promise<GrammarLesson> => {
   const model = "gemini-2.5-flash";
-  const ai = getAiClient();
   const prompt = `
     Create a detailed Grammar Lesson for German learners.
     Level: ${level}
@@ -557,6 +773,7 @@ export const generateGrammarLesson = async (level: string, topic: string): Promi
   };
 
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model,
       contents: prompt,
@@ -569,7 +786,16 @@ export const generateGrammarLesson = async (level: string, topic: string): Promi
     
     const data = JSON.parse(response.text || "{}");
     if (!data.title || !data.explanation) throw new Error("Incomplete grammar lesson");
-    return data;
+    let example = typeof data.example === 'string' ? data.example.trim() : '';
+    if (!example) {
+      const generated = await generateGermanSentence(level, topic, 'Grammar reference', 'neutral');
+      example = generated.sentence || '';
+    }
+    const guarded = applyPedagogicalGuards(example, level);
+    return {
+      ...data,
+      example: guarded.sentence || data.example || ''
+    };
   } catch (e) {
     console.error(e);
     return {

@@ -112,7 +112,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user, onBack }) => {
                    </div>
                    <div>
                       <div className="text-2xl font-display font-bold">{user.completedModules.length} / 72</div>
-                      <div className="text-xs text-stone-500 font-bold uppercase tracking-widest">Missions Complete</div>
+                      <div className="text-xs text-stone-500 font-bold uppercase tracking-widest">Journeys Complete</div>
                    </div>
                 </div>
                 <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm flex items-center gap-4">
@@ -225,7 +225,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user, onBack }) => {
                    </div>
                 ) : (
                    <div className="text-center py-10 text-stone-500">
-                      <p>All unlocked missions completed! Visit the Store to unlock more levels.</p>
+                      <p>All unlocked journeys completed! Visit the Store to unlock more levels.</p>
                    </div>
                 )}
              </div>

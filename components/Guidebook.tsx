@@ -5,6 +5,7 @@ import {
 import { GermanLevel, PracticeDrill } from '../types';
 import { generatePracticeDrills, generateGrammarLesson, GrammarLesson } from '../services/geminiService';
 import Button from './Button';
+import { useTTS } from '../hooks/useTTS';
 
 interface GuidebookProps {
   onBack: () => void;
@@ -29,6 +30,7 @@ const shouldShowContent = (contentLevel: GermanLevel, userLevel: GermanLevel): b
 };
 
 const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
+  const { speak } = useTTS();
   const [activeTab, setActiveTab] = useState<'handbook' | 'alphabet' | 'numbers' | 'practice'>('handbook');
   const [selectedTopicId, setSelectedTopicId] = useState<string>('nouns-articles');
 
@@ -46,9 +48,7 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
 
   // --- AUDIO & SPEECH UTILS ---
   const playAudio = (text: string) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'de-DE';
-    window.speechSynthesis.speak(utterance);
+    speak(text);
   };
 
   const handleGenerateDrills = async () => {
@@ -407,7 +407,7 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
             <ArrowLeft className="w-6 h-6" />
           </button>
           <h1 className="text-xl font-display font-bold text-stone-800 flex items-center gap-2">
-             <Book className="text-[#059669]" /> Field Manual ({level})
+             <Book className="text-[#059669]" /> Travel Guide ({level})
           </h1>
         </div>
       </header>
@@ -521,7 +521,13 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
                                  <span className="text-xs font-bold text-emerald-800 uppercase tracking-widest mb-1 block">Example</span>
                                  <div className="flex items-center justify-between">
                                     <span className="text-xl font-bold text-stone-800">{lessonData.example}</span>
-                                    <button onClick={() => playAudio(lessonData.example)} className="text-[#059669] hover:text-emerald-700"><Volume2 size={24}/></button>
+                                    <button
+                                      onClick={() => playAudio(lessonData.example)}
+                                      disabled={!lessonData.example?.trim()}
+                                      className={`text-[#059669] hover:text-emerald-700 ${!lessonData.example?.trim() ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                    >
+                                      <Volume2 size={24}/>
+                                    </button>
                                  </div>
                               </div>
 

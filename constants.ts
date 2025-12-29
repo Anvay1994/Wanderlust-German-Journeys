@@ -1,6 +1,6 @@
 import { CurriculumModule, GermanLevel } from './types';
 
-// THE BACKBONE: 6 Levels x 12 Modules = 72 Missions (Comprehensive CEFR)
+// THE BACKBONE: 6 Levels x 12 Modules = 72 Journeys (Comprehensive CEFR)
 export const CURRICULUM: CurriculumModule[] = [
   // --- A1: THE TOURIST (Survival German) ---
   {

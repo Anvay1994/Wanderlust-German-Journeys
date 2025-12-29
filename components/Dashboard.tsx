@@ -84,7 +84,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
                </p>
             </div>
             <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full border border-white/30 text-xs font-bold uppercase tracking-widest hover:bg-white/30 transition-colors">
-               Open Field Manual
+               Open Travel Guide
             </div>
          </div>
 
@@ -172,7 +172,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
                     <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">How it works</h3>
                     <p className="text-sm text-stone-600 mb-4">
                       We believe students should be rewarded for hard work. 
-                      Collect credits by completing missions and maintaining your streak.
+                      Collect credits by completing journeys and maintaining your streak.
                       Use credits to get <strong>discounts</strong> on future levels.
                     </p>
                     <div className="space-y-3">
@@ -257,14 +257,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Mission Map (Modules) */}
+          {/* Journey Map (Modules) */}
           <div className="lg:col-span-2 space-y-8">
             
             {GuidebookCard}
 
             <div className="flex items-center justify-between border-b border-stone-300 pb-2 mb-4">
                <h2 className="text-2xl font-display text-stone-800">Your Itinerary</h2>
-               <span className="text-sm text-stone-500 italic">72 Missions to Fluency</span>
+               <span className="text-sm text-stone-500 italic">72 Journeys to Fluency</span>
             </div>
             
             {Object.keys(groupedCurriculum).map((levelKey) => {
@@ -352,7 +352,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
                             <div className="absolute inset-0 bg-stone-900/95 backdrop-blur-sm p-6 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-center z-30 pointer-events-none">
                               <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                                   <h4 className="text-[#059669] font-bold uppercase tracking-widest text-xs mb-3 flex items-center gap-2">
-                                    <Book size={14} /> Mission Syllabus
+                                    <Book size={14} /> Journey Map
                                   </h4>
                                   <div className="mb-4">
                                     <p className="text-[10px] text-stone-500 uppercase font-bold mb-1">Grammar Focus</p>

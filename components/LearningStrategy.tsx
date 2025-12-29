@@ -35,7 +35,7 @@ const LearningStrategy: React.FC<LearningStrategyProps> = ({ onBack }) => {
                <div className="relative z-10 max-w-2xl">
                   <h2 className="text-3xl font-display font-bold mb-4 text-amber-400">Don't just play. Immerse.</h2>
                   <p className="text-stone-300 text-lg leading-relaxed">
-                     Wanderlust isn't a quiz app. It's a simulation. To gain fluency, you must treat every mission like a real-life interaction. Here is your roadmap to mastery.
+                     Wanderlust isn't a quiz app. It's a simulation. To gain fluency, you must treat every journey step like a real-life interaction. Here is your roadmap to mastery.
                   </p>
                </div>
             </div>
@@ -49,16 +49,16 @@ const LearningStrategy: React.FC<LearningStrategyProps> = ({ onBack }) => {
                   {/* Step 1 */}
                   <div className="bg-white p-6 rounded-lg border-2 border-stone-200 hover:border-[#059669] transition-colors shadow-sm group">
                      <div className="w-12 h-12 bg-emerald-100 text-[#059669] rounded-full flex items-center justify-center mb-4 font-bold text-xl group-hover:scale-110 transition-transform">1</div>
-                     <h4 className="font-bold text-lg mb-2">The Briefing (Study)</h4>
+                     <h4 className="font-bold text-lg mb-2">The Overview (Study)</h4>
                      <p className="text-sm text-stone-600">
-                        Never skip the intel. The "Mission Prep" contains the exact vocabulary and grammar rules you need. 
+                        Never skip the notes. The "Journey Overview" contains the exact vocabulary and grammar rules you need. 
                         <strong> Speak the vocabulary out loud</strong> before you start.
                      </p>
                   </div>
                   {/* Step 2 */}
                   <div className="bg-white p-6 rounded-lg border-2 border-stone-200 hover:border-amber-500 transition-colors shadow-sm group">
                      <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4 font-bold text-xl group-hover:scale-110 transition-transform">2</div>
-                     <h4 className="font-bold text-lg mb-2">The Mission (Act)</h4>
+                     <h4 className="font-bold text-lg mb-2">The Journey (Act)</h4>
                      <p className="text-sm text-stone-600">
                         Don't just click suggested responses. Try to <strong>type your own answers</strong> first. 
                         If you get stuck, use the "Sentence Builder" as a scaffold, then remove it later.
@@ -67,9 +67,9 @@ const LearningStrategy: React.FC<LearningStrategyProps> = ({ onBack }) => {
                   {/* Step 3 */}
                   <div className="bg-white p-6 rounded-lg border-2 border-stone-200 hover:border-blue-500 transition-colors shadow-sm group">
                      <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 font-bold text-xl group-hover:scale-110 transition-transform">3</div>
-                     <h4 className="font-bold text-lg mb-2">The Debrief (Review)</h4>
+                     <h4 className="font-bold text-lg mb-2">The Reflection (Review)</h4>
                      <p className="text-sm text-stone-600">
-                        After the mission, read the <strong>Performance Review</strong>. 
+                        After the journey session, read the <strong>Performance Review</strong>. 
                         The AI analyzes your specific mistakes. Note down your "Weaknesses" and practice them in the Guidebook.
                      </p>
                   </div>
@@ -97,7 +97,7 @@ const LearningStrategy: React.FC<LearningStrategyProps> = ({ onBack }) => {
                      <Target className="text-blue-500" /> Strategic Failures
                   </h3>
                   <p className="text-sm text-stone-600 mb-4">
-                     It is okay to fail a mission. In fact, you should try to <strong>push the boundaries</strong>. 
+                     It is okay to stumble on a journey step. In fact, you should try to <strong>push the boundaries</strong>. 
                      Try saying something unexpected to the AI guide. See how it reacts. Testing the limits of the language is how you learn nuances.
                   </p>
                   <div className="bg-blue-50 border border-blue-100 p-3 rounded text-xs text-blue-800 italic">
@@ -122,7 +122,7 @@ const LearningStrategy: React.FC<LearningStrategyProps> = ({ onBack }) => {
                   </h3>
                   <p className="text-sm text-stone-600 mb-4">
                      15 minutes a day is better than 2 hours once a week. 
-                     Use the <strong>Guidebook Drills</strong> for quick 5-minute sessions when you don't have time for a full mission.
+                     Use the <strong>Guidebook Drills</strong> for quick 5-minute sessions when you don't have time for a full journey.
                   </p>
                </div>
 

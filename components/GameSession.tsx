@@ -5,6 +5,7 @@ import MissionPrep from './MissionPrep';
 import Button from './Button';
 import { Mic, Send, Info, CheckCircle2, ArrowLeft, Loader2, Volume2, Map, Puzzle, RefreshCcw, Star, Award, TrendingUp, AlertTriangle } from 'lucide-react';
 import { useSoundEffects } from '../hooks/useSoundEffects';
+import { useTTS } from '../hooks/useTTS';
 
 interface GameSessionProps {
   user: UserProfile;
@@ -14,6 +15,7 @@ interface GameSessionProps {
 
 const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
   const { playSound } = useSoundEffects();
+  const { speak } = useTTS();
   
   // Session State
   const [sessionState, setSessionState] = useState<'prep' | 'chat'>('prep');
@@ -174,9 +176,7 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
   };
 
   const playAudio = (text: string) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'de-DE';
-    window.speechSynthesis.speak(utterance);
+    speak(text);
   };
 
   // RENDER PREP
@@ -187,7 +187,7 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
            <button onClick={() => onExit(0, false)} className="text-stone-400 hover:text-[#059669] transition-colors mr-4">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h1 className="text-lg font-display font-bold text-stone-800">Mission Briefing</h1>
+          <h1 className="text-lg font-display font-bold text-stone-800">Journey Overview</h1>
         </header>
         <div className="flex-1 overflow-hidden relative">
           <MissionPrep 
@@ -213,7 +213,7 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg text-[#059669] animate-bounce">
                   <Award size={40} />
                </div>
-               <h2 className="text-3xl font-display font-bold mb-2">Mission Accomplished</h2>
+               <h2 className="text-3xl font-display font-bold mb-2">Journey Complete</h2>
                <p className="text-emerald-100 font-serif italic">"{module.title}" Complete</p>
              </div>
           </div>
@@ -245,7 +245,7 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
                   </div>
                   <div className="bg-amber-50 p-5 rounded-lg border border-amber-100 animate-slide-up" style={{animationDelay: '0.3s'}}>
                      <h4 className="flex items-center gap-2 text-amber-600 font-bold mb-3 uppercase text-xs tracking-widest">
-                       <AlertTriangle size={16} /> Field Notes
+                       <AlertTriangle size={16} /> Travel Notes
                      </h4>
                      <p className="text-sm text-stone-700 leading-relaxed">{performanceReview.weaknesses}</p>
                   </div>
@@ -259,7 +259,7 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
              )}
 
              <Button onClick={() => onExit(xpSession, true)} className="w-full py-4 text-lg shadow-lg">
-               Return to Base
+               Return to Map
              </Button>
           </div>
         </div>
@@ -317,7 +317,11 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
                     <div className="flex justify-between items-start gap-3">
                       <p className="text-lg leading-relaxed">{msg.content}</p>
                       {msg.role === 'model' && (
-                        <button onClick={() => playAudio(msg.content)} className="text-stone-400 hover:text-[#059669] mt-1">
+                        <button
+                          onClick={() => playAudio(msg.content)}
+                          disabled={!msg.content?.trim()}
+                          className={`text-stone-400 hover:text-[#059669] mt-1 ${!msg.content?.trim() ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        >
                           <Volume2 size={18} />
                         </button>
                       )}
