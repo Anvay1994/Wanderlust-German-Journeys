@@ -1,4 +1,4 @@
-import { CurriculumModule, GermanLevel } from './types';
+import { CurriculumModule, GermanLevel } from './types.js';
 
 // THE BACKBONE: 6 Levels x 12 Modules = 72 Journeys (Comprehensive CEFR)
 export const CURRICULUM: CurriculumModule[] = [
