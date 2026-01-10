@@ -44,13 +44,14 @@ export default async function handler(req: any, res: any) {
       .upsert(payload, { onConflict: 'id' });
 
     if (error) {
+      console.error('[sync-curriculum] upsert error', error);
       res.status(500).json({ ok: false, error: error.message });
       return;
     }
 
     res.status(200).json({ ok: true, count: payload.length });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e?.message || 'Unexpected error' });
+    console.error('[sync-curriculum] unexpected error', e);
+    res.status(500).json({ ok: false, error: e?.message || 'Unexpected error', stack: e?.stack });
   }
 }
-
