@@ -9,16 +9,11 @@ import Guidebook from './components/Guidebook';
 import Analytics from './components/Analytics';
 import LearningStrategy from './components/LearningStrategy';
 import AdminConsole from './components/AdminConsole';
-import AccessGate, { hasLocalAccess } from './components/AccessGate';
 import BugReportButton from './components/BugReportButton';
 import { Loader2 } from 'lucide-react';
 import { supabase, mapProfileToUser, updateUserProfile, upsertModuleProgress } from './services/supabaseClient';
 
 const App: React.FC = () => {
-  const [accessUnlocked, setAccessUnlocked] = useState(() => {
-    if (import.meta.env.DEV) return true;
-    return hasLocalAccess();
-  });
   const [appState, setAppState] = useState<AppState>(AppState.ONBOARDING);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -30,8 +25,6 @@ const App: React.FC = () => {
 
   // SUPABASE AUTH INITIALIZATION
   useEffect(() => {
-    if (!accessUnlocked) return;
-
     const initSession = async () => {
       // 1. Check active session
       const { data: { session } } = await supabase.auth.getSession();
@@ -61,7 +54,7 @@ const App: React.FC = () => {
     };
 
     initSession();
-  }, [accessUnlocked]);
+  }, []);
 
   const fetchUserProfile = async (uid: string) => {
     try {
@@ -217,10 +210,6 @@ const App: React.FC = () => {
 	      await updateUserProfile(userId, updatedUser);
 	    }
 	  };
-
-	  if (!accessUnlocked) {
-	    return <AccessGate onUnlocked={() => setAccessUnlocked(true)} />;
-	  }
 
 	  if (isLoading) {
 	    return (
