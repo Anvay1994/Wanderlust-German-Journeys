@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { CURRICULUM } from '../../constants';
+import { CURRICULUM } from '../../constants.js';
 
 const getEnv = (name: string) => {
   const value = process.env[name];
