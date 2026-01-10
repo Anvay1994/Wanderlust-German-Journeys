@@ -15,9 +15,10 @@ interface DashboardProps {
   onOpenStrategy: () => void;
   onUnlockModule: (moduleId: string, cost: number) => void;
   onDevAction?: (action: 'add_credits' | 'unlock_all' | 'reset' | 'open_admin') => void;
+  onOpenAdmin?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore, onOpenLevelPurchase, onOpenGuidebook, onOpenAnalytics, onOpenStrategy, onDevAction }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore, onOpenLevelPurchase, onOpenGuidebook, onOpenAnalytics, onOpenStrategy, onDevAction, onOpenAdmin }) => {
   const [showTokenInfo, setShowTokenInfo] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
   
@@ -220,13 +221,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectModule, onOpenStore
           
           <div className="flex gap-8 mt-6 md:mt-0">
              
-            {/* Strategy Button */}
-            <div className="flex flex-col items-center cursor-pointer hover:bg-stone-50 p-2 rounded group" onClick={onOpenStrategy}>
-               <span className="text-xs text-stone-400 uppercase tracking-wider font-bold group-hover:text-amber-500 transition-colors">How to Play</span>
-               <div className="text-xl font-display font-bold text-amber-500">
-                  <Lightbulb className="w-6 h-6" />
-               </div>
-            </div>
+	            {/* Strategy Button */}
+	            <div className="flex flex-col items-center cursor-pointer hover:bg-stone-50 p-2 rounded group" onClick={onOpenStrategy}>
+	               <span className="text-xs text-stone-400 uppercase tracking-wider font-bold group-hover:text-amber-500 transition-colors">How to Play</span>
+	               <div className="text-xl font-display font-bold text-amber-500">
+	                  <Lightbulb className="w-6 h-6" />
+	               </div>
+	            </div>
+
+	            {/* Admin Button */}
+	            {onOpenAdmin && (
+	              <div className="flex flex-col items-center cursor-pointer hover:bg-stone-50 p-2 rounded group" onClick={onOpenAdmin}>
+	                <span className="text-xs text-stone-400 uppercase tracking-wider font-bold group-hover:text-emerald-600 transition-colors">Admin</span>
+	                <div className="text-xl font-display font-bold text-emerald-600">
+	                  <ShieldAlert className="w-6 h-6" />
+	                </div>
+	              </div>
+	            )}
 
             {/* Tokens - Clickable for Info */}
             <button 

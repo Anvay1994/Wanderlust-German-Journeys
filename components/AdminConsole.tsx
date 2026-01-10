@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   LayoutDashboard, Users, CreditCard, TrendingUp, Bell, Search, 
   ArrowLeft, Download, DollarSign, Activity, Globe, ShieldAlert, IndianRupee 
@@ -12,6 +12,7 @@ import { GermanLevel } from '../types';
 
 interface AdminConsoleProps {
   onExit: () => void;
+  adminToken?: string | null;
 }
 
 // --- MOCK DATA GENERATORS (INR) ---
@@ -46,9 +47,53 @@ const generateUserTable = () => {
   }));
 };
 
-const AdminConsole: React.FC<AdminConsoleProps> = ({ onExit }) => {
+const AdminConsole: React.FC<AdminConsoleProps> = ({ onExit, adminToken }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'finance'>('dashboard');
   const [userList] = useState(generateUserTable());
+  const [metrics, setMetrics] = useState<{ totalRevenue: number; activeStudents: number; newSignups: number; revenueByLevel: Record<string, number> } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      if (!adminToken) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch('/api/admin/metrics', {
+          headers: { 'x-admin-token': adminToken }
+        });
+        const json = await res.json();
+        if (!res.ok || !json?.ok) {
+          setError(json?.error || 'Failed to load metrics');
+        } else {
+          setMetrics({
+            totalRevenue: json.totalRevenue || 0,
+            activeStudents: json.activeStudents || 0,
+            newSignups: json.newSignups || 0,
+            revenueByLevel: json.revenueByLevel || {}
+          });
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Network error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMetrics();
+  }, [adminToken]);
+
+  const revenueChartData = useMemo(() => {
+    if (!metrics?.revenueByLevel) return salesByLevelData;
+    const entries = Object.entries(metrics.revenueByLevel);
+    if (entries.length === 0) return salesByLevelData;
+    const palette = ['#059669', '#3b82f6', '#8b5cf6', '#d97706', '#14b8a6'];
+    return entries.map(([name, value], idx) => ({
+      name,
+      value,
+      color: palette[idx % palette.length]
+    }));
+  }, [metrics]);
 
   const KPICard = ({ title, value, sub, icon: Icon, color }: any) => (
     <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm flex items-start justify-between">
@@ -129,10 +174,10 @@ const AdminConsole: React.FC<AdminConsoleProps> = ({ onExit }) => {
           {activeTab === 'dashboard' && (
              <>
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <KPICard title="Total Revenue" value="₹4,25,000" sub="+18%" icon={IndianRupee} color="bg-emerald-500" />
-                  <KPICard title="Active Students" value="1,240" sub="+8%" icon={Users} color="bg-blue-500" />
-                  <KPICard title="Avg. Session" value="28m" sub="+5%" icon={Activity} color="bg-amber-500" />
-                  <KPICard title="New Signups" value="315" sub="+12%" icon={Globe} color="bg-purple-500" />
+                  <KPICard title="Total Revenue" value={`₹${(metrics?.totalRevenue || 0).toLocaleString('en-IN')}`} sub={metrics ? '' : 'Live'} icon={IndianRupee} color="bg-emerald-500" />
+                  <KPICard title="Active Students" value={(metrics?.activeStudents ?? 0).toLocaleString('en-IN')} sub={metrics ? '' : 'Live'} icon={Users} color="bg-blue-500" />
+                  <KPICard title="Avg. Session" value="--" sub="(not tracked)" icon={Activity} color="bg-amber-500" />
+                  <KPICard title="New Signups" value={(metrics?.newSignups ?? 0).toLocaleString('en-IN')} sub={metrics ? '' : 'Live'} icon={Globe} color="bg-purple-500" />
                </div>
 
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -166,13 +211,13 @@ const AdminConsole: React.FC<AdminConsoleProps> = ({ onExit }) => {
                         <ResponsiveContainer width="100%" height="100%">
                            <PieChart>
                               <Pie 
-                                 data={salesByLevelData} 
+                                 data={revenueChartData} 
                                  innerRadius={60} 
                                  outerRadius={80} 
                                  paddingAngle={5} 
                                  dataKey="value"
                               >
-                                 {salesByLevelData.map((entry, index) => (
+                                 {revenueChartData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={entry.color} />
                                  ))}
                               </Pie>
@@ -181,13 +226,13 @@ const AdminConsole: React.FC<AdminConsoleProps> = ({ onExit }) => {
                         </ResponsiveContainer>
                      </div>
                      <div className="space-y-2 mt-4">
-                        {salesByLevelData.map(item => (
+                        {revenueChartData.map(item => (
                            <div key={item.name} className="flex justify-between text-sm">
                               <span className="flex items-center gap-2">
                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
                                  {item.name}
                               </span>
-                              <span className="font-bold">{item.value}%</span>
+                              <span className="font-bold">₹{(item.value || 0).toLocaleString('en-IN')}</span>
                            </div>
                         ))}
                      </div>

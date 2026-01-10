@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [activeModule, setActiveModule] = useState<CurriculumModule | null>(null);
   const [showStore, setShowStore] = useState(false);
   const [preSelectedLevel, setPreSelectedLevel] = useState<GermanLevel | null>(null);
+  const [adminToken, setAdminToken] = useState<string | null>(null);
 
   // SUPABASE AUTH INITIALIZATION
   useEffect(() => {
@@ -155,6 +156,14 @@ const App: React.FC = () => {
     setShowStore(true);
   };
 
+  const handleOpenAdmin = () => {
+    const token = window.prompt('Enter admin token');
+    if (token) {
+      setAdminToken(token);
+      setAppState(AppState.ADMIN);
+    }
+  };
+
   const handleUnlockModule = (moduleId: string, cost: number) => {
     if (user && user.credits >= cost) {
       const newCredits = user.credits - cost;
@@ -240,14 +249,15 @@ const App: React.FC = () => {
             onOpenStore={() => setShowStore(true)}
             onOpenLevelPurchase={handleOpenStoreForLevel}
             onOpenGuidebook={() => setAppState(AppState.GUIDEBOOK)}
-            onOpenAnalytics={() => setAppState(AppState.ANALYTICS)}
-            onOpenStrategy={() => setAppState(AppState.LEARNING_STRATEGY)}
-            onUnlockModule={handleUnlockModule}
-            onDevAction={handleDevAction}
-          />
+          onOpenAnalytics={() => setAppState(AppState.ANALYTICS)}
+          onOpenStrategy={() => setAppState(AppState.LEARNING_STRATEGY)}
+          onUnlockModule={handleUnlockModule}
+          onDevAction={handleDevAction}
+          onOpenAdmin={handleOpenAdmin}
+        />
           {showStore && (
             <StoreModal 
-              user={user}
+              user={user} 
               initialLevel={preSelectedLevel}
               onClose={() => { setShowStore(false); setPreSelectedLevel(null); }} 
               onPurchaseLevel={handlePurchaseLevel} 
@@ -286,7 +296,7 @@ const App: React.FC = () => {
       )}
       
       {appState === AppState.ADMIN && (
-        <AdminConsole onExit={() => setAppState(AppState.DASHBOARD)} />
+        <AdminConsole onExit={() => setAppState(AppState.DASHBOARD)} adminToken={adminToken} />
       )}
     </div>
   );
