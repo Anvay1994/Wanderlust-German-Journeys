@@ -99,7 +99,9 @@ const App: React.FC = () => {
     setActiveModule(module);
     setAppState(AppState.GAME_SESSION);
     if (userId) {
-      upsertModuleProgress(userId, module.id, 'in_progress', 0, false);
+      upsertModuleProgress(userId, module.id, 'in_progress', 0, false).catch((err) => {
+        console.error('Progress start failed:', err);
+      });
     }
   };
 
@@ -135,7 +137,9 @@ const App: React.FC = () => {
           completed ? 'completed' : 'in_progress',
           xpEarned,
           completed
-        );
+        ).catch((err) => {
+          console.error('Progress finish failed:', err);
+        });
       }
     }
     setActiveModule(null);

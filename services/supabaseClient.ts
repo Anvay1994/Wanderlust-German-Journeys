@@ -99,25 +99,23 @@ export const upsertModuleProgress = async (
   xpEarned: number = 0,
   completed: boolean = false
 ) => {
-  try {
-    const payload: any = {
-      user_id: userId,
-      module_id: moduleId,
-      status,
-      xp_earned: xpEarned
-    };
-    if (completed) {
-      payload.completed_at = new Date().toISOString();
-    }
-
-    const { error } = await supabase
-      .from('user_module_progress')
-      .upsert([payload], { onConflict: 'user_id,module_id' });
-
-    if (error) {
-      console.error('Module progress upsert failed:', JSON.stringify(error, null, 2));
-    }
-  } catch (err) {
-    console.error('Module progress upsert exception:', err);
+  const payload: any = {
+    user_id: userId,
+    module_id: moduleId,
+    status,
+    xp_earned: xpEarned
+  };
+  if (completed) {
+    payload.completed_at = new Date().toISOString();
   }
+
+  const { error } = await supabase
+    .from('user_module_progress')
+    .upsert([payload], { onConflict: 'user_id,module_id' });
+
+  if (error) {
+    console.error('Module progress upsert failed:', JSON.stringify(error, null, 2));
+    return false;
+  }
+  return true;
 };
