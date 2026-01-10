@@ -14,7 +14,11 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const headerToken = req.headers['x-sync-token'];
+    const headerToken =
+      req.headers['x-sync-token'] ||
+      req.headers['x-sync_token'] ||
+      req.headers['sync-token'] ||
+      req.headers['sync_token'];
     const expected = process.env.SYNC_TOKEN || process.env.ADMIN_SYNC_TOKEN;
     if (!expected) {
       res.status(500).json({ ok: false, error: 'Missing SYNC_TOKEN/ADMIN_SYNC_TOKEN' });
