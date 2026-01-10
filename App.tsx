@@ -12,7 +12,7 @@ import AdminConsole from './components/AdminConsole';
 import AccessGate, { hasLocalAccess } from './components/AccessGate';
 import BugReportButton from './components/BugReportButton';
 import { Loader2 } from 'lucide-react';
-import { supabase, mapProfileToUser, updateUserProfile } from './services/supabaseClient';
+import { supabase, mapProfileToUser, updateUserProfile, upsertModuleProgress } from './services/supabaseClient';
 
 const App: React.FC = () => {
   const [accessUnlocked, setAccessUnlocked] = useState(() => {
@@ -98,6 +98,9 @@ const App: React.FC = () => {
   const handleSelectModule = (module: CurriculumModule) => {
     setActiveModule(module);
     setAppState(AppState.GAME_SESSION);
+    if (userId) {
+      upsertModuleProgress(userId, module.id, 'in_progress', 0, false);
+    }
   };
 
   const handleExitSession = (xpEarned: number, completed: boolean) => {
@@ -126,6 +129,13 @@ const App: React.FC = () => {
           credits: newCredits,
           completedModules: newCompletedModules
         });
+        upsertModuleProgress(
+          userId,
+          activeModule.id,
+          completed ? 'completed' : 'in_progress',
+          xpEarned,
+          completed
+        );
       }
     }
     setActiveModule(null);
