@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { UserProfile, CurriculumModule, GermanLevel } from '../types';
 import { CURRICULUM } from '../constants';
 import { 
@@ -6,13 +6,44 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Cell, AreaChart, Area, CartesianGrid 
 } from 'recharts';
 import { ArrowLeft, TrendingUp, Award, BookOpen, Target, Brain, Languages, Crown, ArrowRight, Compass } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface AnalyticsProps {
   user: UserProfile;
+  userId?: string | null;
   onBack: () => void;
 }
 
-const Analytics: React.FC<AnalyticsProps> = ({ user, onBack }) => {
+const Analytics: React.FC<AnalyticsProps> = ({ user, userId, onBack }) => {
+  const [progress, setProgress] = useState<{ module_id: string; status: string }[]>([]);
+
+  // Fetch server progress so charts reflect actual data
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (!userId) return;
+      const { data, error } = await supabase
+        .from('user_module_progress')
+        .select('module_id,status')
+        .eq('user_id', userId);
+      if (error) {
+        console.error('Progress fetch error:', error);
+        return;
+      }
+      setProgress(data || []);
+    };
+    fetchProgress();
+  }, [userId]);
+
+  const completedFromProgress = useMemo(() => {
+    if (!progress || progress.length === 0) return null;
+    return progress
+      .filter((row) => row.status === 'completed')
+      .map((row) => row.module_id);
+  }, [progress]);
+
+  const completedModules = completedFromProgress && completedFromProgress.length > 0
+    ? completedFromProgress
+    : user.completedModules;
 
   // --- STATS CALCULATION ---
 
@@ -36,7 +67,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user, onBack }) => {
         default: type = 'Speaking';
       }
       skills[type].total += 1;
-      if (user.completedModules.includes(mod.id)) {
+      if (completedModules.includes(mod.id)) {
         skills[type].count += 1;
       }
     });
@@ -46,14 +77,14 @@ const Analytics: React.FC<AnalyticsProps> = ({ user, onBack }) => {
       A: Math.round((val.count / Math.max(1, val.total)) * 100),
       fullMark: 100
     }));
-  }, [user.completedModules]);
+  }, [completedModules]);
 
   // 2. Level Progress Data
   const levelProgressData = useMemo(() => {
     const levels = Object.values(GermanLevel);
     return levels.map(lvl => {
       const modulesInLevel = CURRICULUM.filter(m => m.level === lvl);
-      const completedInLevel = modulesInLevel.filter(m => user.completedModules.includes(m.id)).length;
+      const completedInLevel = modulesInLevel.filter(m => completedModules.includes(m.id)).length;
       return {
         name: lvl,
         completed: completedInLevel,
@@ -61,18 +92,18 @@ const Analytics: React.FC<AnalyticsProps> = ({ user, onBack }) => {
         percentage: Math.round((completedInLevel / Math.max(1, modulesInLevel.length)) * 100)
       };
     });
-  }, [user.completedModules]);
+  }, [completedModules]);
 
   // 3. Est. Vocabulary
   // Assuming approx 15 new words per module
-  const estVocabulary = user.completedModules.length * 15;
+  const estVocabulary = completedModules.length * 15;
 
   // 4. Focus Areas (Next 3 uncompleted modules)
   const focusAreas = useMemo(() => {
     return CURRICULUM
-      .filter(m => !user.completedModules.includes(m.id) && user.unlockedModules.includes(m.id))
+      .filter(m => !completedModules.includes(m.id) && user.unlockedModules.includes(m.id))
       .slice(0, 3);
-  }, [user.completedModules, user.unlockedModules]);
+  }, [completedModules, user.unlockedModules]);
 
   return (
     <div className="min-h-screen bg-[#f5f5f4] text-stone-800 paper-texture flex flex-col">

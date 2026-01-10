@@ -281,6 +281,7 @@ const App: React.FC = () => {
       {appState === AppState.ANALYTICS && user && (
         <Analytics 
           user={user}
+          userId={userId}
           onBack={() => setAppState(AppState.DASHBOARD)}
         />
       )}
