@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 // Using consistent CDN assets for reliability
 const SOUND_URLS = {
@@ -11,15 +11,30 @@ const SOUND_URLS = {
 };
 
 export const useSoundEffects = () => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const playSound = useCallback((type: keyof typeof SOUND_URLS, volume = 0.5) => {
     try {
+      // Stop any currently playing sound
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       const audio = new Audio(SOUND_URLS[type]);
       audio.volume = volume;
+      audioRef.current = audio;
       audio.play().catch(e => console.warn("Audio play blocked (interaction required)", e));
     } catch (e) {
       console.error("Audio error", e);
     }
   }, []);
 
-  return { playSound };
+  const stopSound = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  }, []);
+
+  return { playSound, stopSound };
 };

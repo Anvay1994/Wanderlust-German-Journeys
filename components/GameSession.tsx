@@ -14,8 +14,8 @@ interface GameSessionProps {
 }
 
 const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
-  const { playSound } = useSoundEffects();
-  const { speak } = useTTS();
+  const { playSound, stopSound } = useSoundEffects();
+  const { speak, cancel } = useTTS();
   
   // Session State
   const [sessionState, setSessionState] = useState<'prep' | 'chat'>('prep');
@@ -40,6 +40,14 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
   const [jumbledWords, setJumbledWords] = useState<{id: number, text: string}[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      cancel(); // Stop TTS
+      stopSound(); // Stop any playing sound effects
+    };
+  }, [cancel, stopSound]);
 
   // Initialize Chat when switching to 'chat' state
   useEffect(() => {
