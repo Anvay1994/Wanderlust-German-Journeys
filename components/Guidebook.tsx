@@ -47,8 +47,8 @@ const Guidebook: React.FC<GuidebookProps> = ({ onBack, level }) => {
   const [loadingChapter, setLoadingChapter] = useState(false);
 
   // --- AUDIO & SPEECH UTILS ---
-  const playAudio = (text: string) => {
-    speak(text);
+  const playAudio = (text: string, lang: 'de-DE' | 'en-US' = 'de-DE') => {
+    speak(text, { lang });
   };
 
   const handleGenerateDrills = async () => {

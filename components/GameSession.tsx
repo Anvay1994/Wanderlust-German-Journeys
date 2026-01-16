@@ -175,8 +175,8 @@ const GameSession: React.FC<GameSessionProps> = ({ user, module, onExit }) => {
     });
   };
 
-  const playAudio = (text: string) => {
-    speak(text);
+  const playAudio = (text: string, lang: 'de-DE' | 'en-US' = 'de-DE') => {
+    speak(text, { lang });
   };
 
   // RENDER PREP

@@ -61,8 +61,8 @@ const MissionPrep: React.FC<MissionPrepProps> = ({ module, onStart, onCancel }) 
     setClearanceAnswers({});
   }, [briefing?.missionGoal, module.id]);
 
-  const playAudio = (text: string) => {
-    speak(text);
+  const playAudio = (text: string, lang: 'de-DE' | 'en-US' = 'de-DE') => {
+    speak(text, { lang });
   };
 
   const safeBriefing = useMemo(() => {

@@ -152,14 +152,28 @@ const isBriefingMalformed = (data: any) => {
   return !hasVocab && !hasPhrases;
 };
 
-const sanitizeClearance = (items: any[]) => {
+const sanitizeClearance = (items: any[], level?: string) => {
   if (!Array.isArray(items)) return [];
-  return items.map((item) => ({
-    ...item,
-    question: sanitizeTravelCopy(item.question || ''),
-    options: Array.isArray(item.options) ? item.options.map((opt: string) => sanitizeTravelCopy(opt)) : [],
-    explanation: sanitizeTravelCopy(item.explanation || '')
-  }));
+  return items.map((item) => {
+    const question = sanitizeTravelCopy(item.question || '');
+    const options = Array.isArray(item.options) ? item.options.map((opt: string) => sanitizeTravelCopy(opt)) : [];
+
+    // Check for blacklisted patterns in quiz content
+    const hasBlacklistedQuestion = hasBlacklistedPattern(question, level);
+    const hasBlacklistedOption = options.some((opt: string) => hasBlacklistedPattern(opt, level));
+
+    // Skip questions that teach incorrect grammar patterns
+    if (hasBlacklistedQuestion || hasBlacklistedOption) {
+      return null;
+    }
+
+    return {
+      ...item,
+      question,
+      options,
+      explanation: sanitizeTravelCopy(item.explanation || '')
+    };
+  }).filter(Boolean);
 };
 
 const generateMissionBriefingInternal = async (
@@ -170,10 +184,15 @@ const generateMissionBriefingInternal = async (
   const prompt = `
     Create a COMPREHENSIVE learning guide for a German learner.
     This is the "Journey Overview" phase. It MUST be detailed and complete.
-    
+
     Module: ${module.title} (${module.level})
     Grammar Focus: ${module.grammarFocus.join(', ')}
     Vocab Theme: ${module.vocabularyTheme}
+
+    CRITICAL PEDAGOGICAL RULES:
+    - NEVER use "Ich bin aus [country/city]" for expressing origin. The correct German is "Ich komme aus [country/city]".
+    - Example sentences MUST use a SINGLE consistent subject/pronoun throughout. Do NOT switch subjects mid-example (e.g., "Ich bin Anna. Sie ist..." is WRONG - keep it as "Ich bin Anna. Ich bin...").
+    - All quiz questions and options must follow these same rules.
 
     Output JSON with:
     1. missionGoal: A 1-sentence journey goal (use travel language, not military words).
@@ -182,7 +201,7 @@ const generateMissionBriefingInternal = async (
        - title: The specific Grammar Rule name.
        - explanation: A detailed, step-by-step explanation. DO NOT truncate. Explain *how* and *when* to use it. (approx 4-5 sentences).
        - keyPoints: 3 concise bullet points.
-       - example: A sentence demonstrating the rule in context.
+       - example: A sentence demonstrating the rule in context. Use a SINGLE consistent subject throughout.
        - grammarTable: A structured table. 'headers' (list of strings) and 'rows' (list of lists of strings).
        - commonMistakes: 2-3 common errors.
     4. keyPhrases: 4 useful sentences for the scenario.
@@ -192,6 +211,7 @@ const generateMissionBriefingInternal = async (
        - Each question has 4 options.
        - correctAnswer is an index 0-3.
        - Include a short explanation for why the correct option is correct.
+       - NEVER create a question like "Ich ___ aus Deutschland" with "bin" as the answer. Use "kommen" for origin.
   `;
 
   const schema = {
@@ -325,7 +345,7 @@ const generateMissionBriefingInternal = async (
               options: Array.isArray(data.quiz.options) ? data.quiz.options.map((opt: string) => sanitizeTravelCopy(opt)) : []
             }
           : data.quiz,
-        securityClearance: sanitizeClearance(Array.isArray(data.securityClearance) ? data.securityClearance : [])
+        securityClearance: sanitizeClearance(Array.isArray(data.securityClearance) ? data.securityClearance : [], module.level)
     };
 
     if (safeBriefing.lesson.grammarTable) {

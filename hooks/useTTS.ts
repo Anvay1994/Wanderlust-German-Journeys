@@ -13,8 +13,10 @@ const DEFAULT_DEBOUNCE = 350;
 
 let cachedVoices: SpeechSynthesisVoice[] = [];
 let germanVoice: SpeechSynthesisVoice | null = null;
+let englishVoice: SpeechSynthesisVoice | null = null;
 let voicesReady = false;
 let warnedNoGerman = false;
+let warnedNoEnglish = false;
 let lastSpokenAt = 0;
 let voicesPromise: Promise<void> | null = null;
 
@@ -26,12 +28,23 @@ const selectGermanVoice = (voices: SpeechSynthesisVoice[]) => {
   return null;
 };
 
+const selectEnglishVoice = (voices: SpeechSynthesisVoice[]) => {
+  const usEnglish = voices.find((voice) => voice.lang?.toLowerCase() === 'en-us');
+  if (usEnglish) return usEnglish;
+  const ukEnglish = voices.find((voice) => voice.lang?.toLowerCase() === 'en-gb');
+  if (ukEnglish) return ukEnglish;
+  const anyEnglish = voices.find((voice) => voice.lang?.toLowerCase().startsWith('en'));
+  if (anyEnglish) return anyEnglish;
+  return null;
+};
+
 const refreshVoices = () => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   const voices = window.speechSynthesis.getVoices();
   if (!voices || voices.length === 0) return;
   cachedVoices = voices;
   germanVoice = selectGermanVoice(voices);
+  englishVoice = selectEnglishVoice(voices);
   voicesReady = true;
 };
 
@@ -90,12 +103,25 @@ export const useTTS = () => {
     await ensureVoices();
 
     const utterance = new SpeechSynthesisUtterance(trimmed);
-    utterance.lang = options.lang || DEFAULT_LANG;
-    if (germanVoice) {
-      utterance.voice = germanVoice;
-    } else if (!warnedNoGerman) {
-      console.warn('[TTS] No German voice found. Falling back to de-DE without a specific voice.');
-      warnedNoGerman = true;
+    const lang = options.lang || DEFAULT_LANG;
+    utterance.lang = lang;
+
+    // Select voice based on language
+    const isEnglish = lang.toLowerCase().startsWith('en');
+    if (isEnglish) {
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+      } else if (!warnedNoEnglish) {
+        console.warn('[TTS] No English voice found. Falling back to en-US without a specific voice.');
+        warnedNoEnglish = true;
+      }
+    } else {
+      if (germanVoice) {
+        utterance.voice = germanVoice;
+      } else if (!warnedNoGerman) {
+        console.warn('[TTS] No German voice found. Falling back to de-DE without a specific voice.');
+        warnedNoGerman = true;
+      }
     }
     utterance.rate = options.rate ?? 1;
     utterance.pitch = options.pitch ?? 1;
